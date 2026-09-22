@@ -64,7 +64,9 @@ export default function Board({ applications, loading, token, userName = "", onC
   async function runAI(application, kind) {
     setAI({ application, kind, loading: true, result: "" });
     try {
-      const { result, source } = await api(`/ai/${application._id}/${kind}`, { token, method: "POST" });
+      const endpoint = kind === "follow-up" ? "/ai/generate-email" : `/ai/${application._id}/tips`;
+      const body = kind === "follow-up" ? { applicationId: application._id } : undefined;
+      const { result, source } = await api(endpoint, { token, method: "POST", body });
       setAI({ application, kind, loading: false, result, source });
     } catch (error) {
       setAI({ application, kind, loading: false, error: error.message });

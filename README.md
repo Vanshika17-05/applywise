@@ -47,7 +47,7 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
 | `OPENAI_API_KEY` | Optional direct OpenAI credential for follow-up emails and interview tips |
 | `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway credential outside Vercel |
-| `OPENAI_MODEL` | GPT-4 family model; defaults to `gpt-4o` |
+| `OPENAI_MODEL` | OpenAI model; defaults to the requested `gpt-4` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
@@ -63,7 +63,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Vercel deployments use OIDC with AI Gateway for live Follow-up and Tips generation. Add `OPENAI_API_KEY` only when direct OpenAI billing is preferred. `OPENAI_MODEL` defaults to `gpt-4o`.
+3. Vercel deployments can use OIDC with AI Gateway for live Follow-up and Tips generation. Add `OPENAI_API_KEY` for direct OpenAI access. `OPENAI_MODEL` defaults to `gpt-4`.
 4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
 5. Redeploy after changing environment variables.
 
@@ -83,6 +83,7 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `PATCH`, `DELETE` | `/api/applications/:id` | Edit, move, or remove an application |
 | `GET` | `/api/applications/:id/resume` | Get a short lived private download URL |
 | `POST` | `/api/ai/:id/follow-up` | Generate follow-up email |
+| `POST` | `/api/ai/generate-email` | Generate a follow-up email from `{ applicationId }` |
 | `POST` | `/api/ai/:id/tips` | Generate three interview preparation tips |
 | `GET` | `/api/health` | Health check |
 

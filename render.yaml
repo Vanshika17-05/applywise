@@ -17,7 +17,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4o
+        value: gpt-4
       - key: AWS_REGION
         sync: false
       - key: AWS_S3_BUCKET
