@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
@@ -25,6 +25,7 @@ export default function Workspace() {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const recentMove = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -35,9 +36,11 @@ export default function Workspace() {
   }, [token]);
 
   useEffect(() => {
+    if (import.meta.env.PROD && !import.meta.env.VITE_SOCKET_URL) return undefined;
     const socket = io(socketUrl(), { auth: { token }, transports: ["websocket", "polling"] });
     socket.on("application:status", (update) => {
       setApplications((current) => current.map((application) => application._id === update.applicationId ? { ...application, status: update.status } : application));
+      if (recentMove.current?.applicationId === update.applicationId && Date.now() - recentMove.current.at < 5000) return;
       toast(`${update.company} moved to ${update.status}`, { icon: <Bell size={16} color="var(--accent)" /> });
     });
     return () => socket.disconnect();
@@ -71,10 +74,12 @@ export default function Workspace() {
 
   async function move(application, status) {
     if (application.status === status) return;
+    recentMove.current = { applicationId: application._id, at: Date.now() };
     try {
       const { application: updated } = await api(`/applications/${application._id}`, { token, method: "PATCH", body: { status } });
       save(updated);
-    } catch (error) { toast.error(error.message); }
+      toast(`${updated.company} moved to ${updated.status}`, { icon: <Bell size={16} color="var(--accent)" /> });
+    } catch (error) { recentMove.current = null; toast.error(error.message); }
   }
 
   function openCreate() { setEditing(null); setFormOpen(true); }

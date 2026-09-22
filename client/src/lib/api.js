@@ -17,5 +17,5 @@ export async function api(path, { token, body, ...options } = {}) {
 }
 
 export function socketUrl() {
-  return API_URL || window.location.origin;
+  return import.meta.env.VITE_SOCKET_URL || API_URL || window.location.origin;
 }

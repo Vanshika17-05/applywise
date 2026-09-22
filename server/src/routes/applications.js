@@ -83,9 +83,11 @@ router.patch("/:id", async (req, res, next) => {
     const previousStatus = application.status;
     Object.assign(application, data);
     await application.save();
-    if (previousStatus !== application.status) req.app.get("io").to(`user:${req.userId}`).emit("application:status", {
-      applicationId: application.id, company: application.company, role: application.role, status: application.status
-    });
+    if (previousStatus !== application.status) {
+      req.app.get("io")?.to(`user:${req.userId}`).emit("application:status", {
+        applicationId: application.id, company: application.company, role: application.role, status: application.status
+      });
+    }
     res.json({ application });
   } catch (error) { next(error); }
 });

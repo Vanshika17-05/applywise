@@ -1,6 +1,7 @@
 {
   "name": "applywise",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm --parallel --filter @applywise/client --filter @applywise/server dev",
     "dev:local": "pnpm --parallel --filter @applywise/client --filter @applywise/server dev:local",
