@@ -118,7 +118,7 @@ button { cursor: pointer; }
 .glass-soft,
 .board-lane { background: var(--glass-soft); }
 .board-lane { background: linear-gradient(155deg, color-mix(in srgb, var(--glass-soft) 86%, var(--accent-muted)), var(--glass-soft)); transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
-.board-lane-dragging { border-style: dashed; border-color: var(--accent-border); }
+.board-lane-dragging { border-style: dashed; border-color: var(--accent); box-shadow: var(--shadow), inset 0 0 0 1px var(--accent-muted); }
 .board-lane-over { border-color: var(--accent); background: color-mix(in srgb, var(--glass-soft) 78%, var(--accent-muted)); box-shadow: var(--shadow), 0 0 0 1px var(--accent-border), 0 0 24px var(--accent-muted); }
 .glass-header { border-left: 0; border-right: 0; border-top: 0; }
 .glass-sidebar { border-left: 0; border-top: 0; border-bottom: 0; }
@@ -239,6 +239,31 @@ html[data-theme="light"] .ai-dialog { box-shadow: 0 26px 90px rgba(21, 65, 61, .
 }
 .theme-toggle:hover { border-color: var(--accent-border); background: var(--accent-muted); transform: translateY(-1px); }
 .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 0;
+  top: calc(100% + 9px);
+  width: max-content;
+  max-width: 180px;
+  padding: 6px 9px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--glass-strong);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity .16s ease, transform .16s ease;
+  white-space: nowrap;
+  z-index: 70;
+}
+.theme-toggle { position: relative; }
+.theme-toggle:hover::after, .theme-toggle:focus-visible::after { opacity: 1; transform: translateY(0); }
 .brand-mark { background: var(--accent); color: var(--accent-foreground); box-shadow: 0 8px 22px var(--accent-muted); }
 .accent-pill { border: 1px solid var(--accent-border); background: var(--accent-muted); color: var(--accent-text); }
 .accent-gradient-text { background: linear-gradient(95deg, var(--accent-text), var(--applied)); background-clip: text; -webkit-background-clip: text; color: transparent; }
@@ -247,6 +272,7 @@ html[data-theme="light"] .ai-dialog { box-shadow: 0 26px 90px rgba(21, 65, 61, .
 .nav-link.active { background: var(--accent-muted); color: var(--accent-text); }
 .theme-rule { border-color: var(--stroke); }
 .app-grid { background-image: radial-gradient(var(--stroke) 1px, transparent 1px); background-size: 25px 25px; }
+.workspace-shell { overflow-x: clip; }
 .drag-over { background: var(--accent-muted); }
 .drop-empty { border: 1px dashed var(--stroke); }
 .board-lane-dragging .drop-empty { border-color: var(--accent-border); }

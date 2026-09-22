@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
-import { BarChart3, Bell, CircleDashed, LayoutGrid, Plus, Sparkles } from "lucide-react";
+import { BarChart3, Bell, CircleDashed, LayoutGrid, Plus } from "lucide-react";
 import { api, socketUrl } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { ThemeToggle } from "@/state/theme";
@@ -88,8 +88,8 @@ export default function Workspace() {
   const counts = useMemo(() => applications.reduce((result, item) => ({ ...result, [item.status]: (result[item.status] || 0) + 1 }), {}), [applications]);
   const view = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Overview";
 
-  return <div className="min-h-screen page-bg text-main lg:flex">
-    <aside className="sticky top-0 z-30 hidden h-screen w-[246px] shrink-0 flex-col border-r border-theme glass-sidebar px-4 py-7 lg:flex">
+  return <div className="workspace-shell min-h-screen page-bg text-main lg:flex">
+    <aside className="sticky left-0 top-0 z-30 hidden h-screen w-[260px] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-theme glass-sidebar px-5 py-7 lg:flex">
       <div className="flex items-center gap-2.5 px-3 text-xl font-extrabold tracking-tight"><span className="brand-mark flex size-9 items-center justify-center rounded-xl"><CircleDashed size={21} strokeWidth={2.7} /></span> applywise<span className="text-accent">.</span></div>
       <div className="mt-12 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-faint">Workspace</div>
       <nav className="mt-3 space-y-1">
@@ -98,8 +98,7 @@ export default function Workspace() {
       </nav>
       <div className="mt-10 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-faint">Pipeline</div>
       <div className="mt-3 space-y-1 px-3">{["Applied", "Interview", "Offer", "Rejected"].map((status) => <div key={status} className="flex items-center justify-between py-1.5 text-sm text-subtle"><span>{status}</span><span className="text-xs tabular-nums text-faint">{counts[status] || 0}</span></div>)}</div>
-      <div className="hero-glass mt-auto rounded-2xl p-4"><Sparkles size={17} className="text-accent" /><p className="mt-3 text-sm font-semibold">Your next move starts here.</p><p className="mt-1 text-xs leading-relaxed text-muted">Keep every opportunity in focus.</p></div>
-      <AccountMenu user={session.user} onLogout={signOut} />
+      <div className="mt-auto pt-6"><AccountMenu user={session.user} onLogout={signOut} /></div>
     </aside>
     <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-20 flex h-[74px] items-center justify-between border-b border-theme glass-header px-5 backdrop-blur-xl sm:px-8 lg:px-10">

@@ -24,7 +24,8 @@ export function useTheme() { return useContext(ThemeContext); }
 export function ThemeToggle({ className = "" }) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  return <button type="button" onClick={toggleTheme} className={`theme-toggle ${className}`} aria-label={`Switch to ${isDark ? "day" : "night"} mode`} title={`Switch to ${isDark ? "day" : "night"} mode`}>
+  const label = `Switch to ${isDark ? "light" : "dark"} mode`;
+  return <button type="button" onClick={toggleTheme} className={`theme-toggle ${className}`} aria-label={label} title={label} data-tooltip={label}>
     {isDark ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
   </button>;
 }

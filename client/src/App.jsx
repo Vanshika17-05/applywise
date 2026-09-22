@@ -7,7 +7,7 @@ const Workspace = lazy(() => import("@/pages/Workspace"));
 
 function AppSkeleton() {
   return <div className="page-bg min-h-screen lg:flex" role="status" aria-label="Loading Applywise">
-    <div className="hidden w-[246px] shrink-0 border-r border-theme glass-sidebar p-6 lg:block"><div className="h-9 w-36 animate-pulse rounded-xl bg-accent-soft" /><div className="mt-20 h-11 animate-pulse rounded-xl bg-accent-soft" /><div className="mt-3 h-11 w-4/5 animate-pulse rounded-xl bg-accent-soft" /></div>
+    <div className="hidden w-[260px] shrink-0 border-r border-theme glass-sidebar p-6 lg:block"><div className="h-9 w-36 animate-pulse rounded-xl bg-accent-soft" /><div className="mt-20 h-11 animate-pulse rounded-xl bg-accent-soft" /><div className="mt-3 h-11 w-4/5 animate-pulse rounded-xl bg-accent-soft" /></div>
     <div className="min-w-0 flex-1"><div className="glass-header h-[74px] border-b border-theme" /><div className="mx-auto max-w-[1700px] px-5 py-8 sm:px-8 lg:px-10"><div className="h-36 animate-pulse rounded-[28px] glass-soft" /><div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl glass-soft" />)}</div><div className="mt-9 h-80 animate-pulse rounded-2xl glass-soft" /></div></div>
   </div>;
 }

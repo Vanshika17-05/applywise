@@ -26,7 +26,7 @@ try {
   await page.waitForTimeout(650);
   assert.notEqual(await beam.getAttribute("x1"), beamPosition, "Background beams should move over time");
 
-  await page.getByRole("button", { name: "Switch to day mode" }).click();
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
@@ -41,7 +41,7 @@ try {
     await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(screenshots, "board-light.png"), fullPage: true });
 
-    await page.getByRole("button", { name: "Switch to night mode" }).click();
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(screenshots, "board-dark.png"), fullPage: true });
 
@@ -50,7 +50,7 @@ try {
     await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(screenshots, "analytics-dark.png"), fullPage: true });
 
-    await page.getByRole("button", { name: "Switch to day mode" }).click();
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(screenshots, "analytics-light.png"), fullPage: true });
   }

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { User } from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
 import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, readLocalProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
+import { createStarterApplications } from "../services/demo-applications.js";
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
@@ -57,6 +58,8 @@ router.post("/register", limiter, async (req, res, next) => {
     const { name, email, password } = parsed.data;
     if (await User.exists({ email })) return res.status(409).json({ error: "An account with that email already exists" });
     const user = await User.create({ name, email, passwordHash: await bcrypt.hash(password, 12) });
+    try { await createStarterApplications(user._id); }
+    catch (error) { console.error("Could not create starter applications", error); }
     res.status(201).json({ token: issueToken(user), user: await publicUser(user, req) });
   } catch (error) { next(error); }
 });
