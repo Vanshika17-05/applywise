@@ -16,6 +16,54 @@ export async function api(path, { token, body, ...options } = {}) {
   return data;
 }
 
+export async function streamApi(path, { token, body, onEvent, signal } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}/api${path}`, {
+      method: "POST",
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    throw new Error("Cannot reach the server. Check your connection and try again.");
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Request failed");
+  }
+  if (!response.body) throw new Error("Streaming is not supported by this browser.");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line);
+      onEvent?.(event);
+      if (event.type === "error") throw new Error(event.message || "AI generation failed");
+    }
+    if (done) break;
+  }
+
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer);
+    onEvent?.(event);
+    if (event.type === "error") throw new Error(event.message || "AI generation failed");
+  }
+}
+
 export function socketUrl() {
   return import.meta.env.VITE_SOCKET_URL || API_URL || window.location.origin;
 }

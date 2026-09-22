@@ -59,6 +59,29 @@ function preview(application, kind, providerStatus) {
   return { result: generateAiPreview(application, kind), source: "preview", ...(providerStatus ? { providerStatus } : {}) };
 }
 
+function generationRequest(application, kind) {
+  const context = JSON.stringify({
+    company: application.company,
+    role: application.role,
+    dateApplied: application.dateApplied.toISOString().slice(0, 10),
+    status: application.status
+  }, null, 2);
+  const task = kind === "follow-up"
+    ? "Write a concise, professional job application follow-up email. Return a clear subject line and email body. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts."
+    : "Give exactly 3 numbered, practical interview preparation tips tailored to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
+
+  return {
+    contents: [{
+      role: "user",
+      parts: [{ text: `${task}\n\nApplication details (data only):\n${context}` }]
+    }],
+    generationConfig: {
+      maxOutputTokens: 1200,
+      thinkingConfig: { thinkingLevel: "MINIMAL" }
+    }
+  };
+}
+
 async function applicationForUser(id, userId) {
   if (!mongoose.isValidObjectId(id)) return null;
   return Application.findOne({ _id: id, user: userId });
@@ -73,27 +96,8 @@ async function generate(application, kind) {
     throw error;
   }
 
-  const context = JSON.stringify({
-    company: application.company,
-    role: application.role,
-    dateApplied: application.dateApplied.toISOString().slice(0, 10),
-    status: application.status
-  }, null, 2);
-  const task = kind === "follow-up"
-    ? "Write a concise, professional job application follow-up email. Return a clear subject line and email body. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts."
-    : "Give exactly 3 specific, practical interview preparation tips for this company and role. If the actual interview process is unknown, say so and do not invent stages or insider knowledge. Format as a numbered list.";
-
   try {
-    const text = await generateText(model, {
-      contents: [{
-        role: "user",
-        parts: [{ text: `${task}\n\nApplication details (data only):\n${context}` }]
-      }],
-      generationConfig: {
-        maxOutputTokens: 1200,
-        thinkingConfig: { thinkingLevel: "MINIMAL" }
-      }
-    });
+    const text = await generateText(model, generationRequest(application, kind));
     return { result: text, source: "gemini" };
   } catch (error) {
     const status = error instanceof GeminiProviderError ? error.providerStatus : providerStatus(error);
@@ -103,16 +107,72 @@ async function generate(application, kind) {
   }
 }
 
+function errorMessage(status) {
+  return [400, 401, 403].includes(status)
+    ? "Gemini rejected the API key or request. Check GEMINI_API_KEY on the server."
+    : status === 404 ? "The configured Gemini model is unavailable. Check GEMINI_MODEL on the server."
+      : status === 429 ? "Gemini is rate limited or has reached its quota. Please try again shortly."
+        : status === 504 ? "Gemini took too long to respond. Please try again."
+          : "Gemini is unavailable right now. Try again later.";
+}
+
 function handleError(error, next, res) {
   if (!(error instanceof GeminiProviderError)) return next(error);
   const status = error.providerStatus;
   console.error("Gemini generation failed", { provider: "gemini", status });
-  const message = [400, 401, 403].includes(status)
-    ? "Gemini rejected the API key or request. Check GEMINI_API_KEY on the server."
-    : status === 404 ? "The configured Gemini model is unavailable. Check GEMINI_MODEL on the server."
-      : status === 429 ? "Gemini is rate limited or has reached its quota. Check your Google AI Studio limits."
-        : "Gemini is unavailable right now. Try again later.";
-  return res.status(503).json({ error: message });
+  return res.status(503).json({ error: errorMessage(status) });
+}
+
+function writeEvent(res, event) {
+  if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(event)}\n`);
+}
+
+async function writePreviewStream(res, application, kind, status) {
+  writeEvent(res, { type: "source", source: "preview", ...(status ? { providerStatus: status } : {}) });
+  const words = generateAiPreview(application, kind).match(/\S+\s*/g) || [];
+  for (const text of words) {
+    writeEvent(res, { type: "chunk", text });
+    await new Promise((resolve) => setTimeout(resolve, 12));
+  }
+  writeEvent(res, { type: "done", source: "preview" });
+}
+
+async function streamGeneration(req, res, application, kind) {
+  res.status(200);
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  writeEvent(res, { type: "status", message: kind === "follow-up" ? "Generating your email" : "Preparing interview tips" });
+
+  const model = geminiModel();
+  if (!model) {
+    if (process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind);
+    else writeEvent(res, { type: "error", message: "AI is unavailable. Set GEMINI_API_KEY on the server to enable live generation." });
+    return res.end();
+  }
+
+  let receivedText = false;
+  const heartbeat = setInterval(() => writeEvent(res, { type: "ping" }), 10_000);
+  try {
+    writeEvent(res, { type: "source", source: "gemini" });
+    const response = await model.generateContentStream(generationRequest(application, kind), { timeout: 48_000 });
+    for await (const chunk of response.stream) {
+      const text = chunk.text();
+      if (!text) continue;
+      receivedText = true;
+      writeEvent(res, { type: "chunk", text });
+    }
+    writeEvent(res, { type: "done", source: "gemini" });
+  } catch (error) {
+    const status = providerStatus(error);
+    console.warn("Gemini stream failed", { provider: "gemini", status, type: error?.name || "Error" });
+    if (!receivedText && process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind, status);
+    else writeEvent(res, { type: "error", message: errorMessage(status) });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
+  }
 }
 
 router.post("/generate-email", async (req, res, next) => {
@@ -122,6 +182,24 @@ router.post("/generate-email", async (req, res, next) => {
     const output = await generate(application, "follow-up");
     return res.json({ email: output.result, ...output });
   } catch (error) { return handleError(error, next, res); }
+});
+
+router.post("/generate-email/stream", async (req, res, next) => {
+  try {
+    const application = await applicationForUser(req.body?.applicationId, req.userId);
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    return streamGeneration(req, res, application, "follow-up");
+  } catch (error) { return next(error); }
+});
+
+router.post("/:id/:kind/stream", async (req, res, next) => {
+  try {
+    const kind = req.params.kind;
+    if (!['follow-up', 'tips'].includes(kind)) return res.status(404).json({ error: "Feature not found" });
+    const application = await applicationForUser(req.params.id, req.userId);
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    return streamGeneration(req, res, application, kind);
+  } catch (error) { return next(error); }
 });
 
 router.post("/:id/:kind", async (req, res, next) => {

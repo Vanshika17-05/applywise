@@ -83,7 +83,9 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `GET` | `/api/applications/:id/resume` | Get a short lived private download URL |
 | `POST` | `/api/ai/:id/follow-up` | Generate follow-up email |
 | `POST` | `/api/ai/generate-email` | Generate a follow-up email from `{ applicationId }` |
+| `POST` | `/api/ai/generate-email/stream` | Stream a follow-up email as newline-delimited JSON events |
 | `POST` | `/api/ai/:id/tips` | Generate three interview preparation tips |
+| `POST` | `/api/ai/:id/tips/stream` | Stream three interview preparation tips as newline-delimited JSON events |
 | `GET` | `/api/health` | Health check |
 
 The bearer JWT scopes application and AI routes to the signed in user. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to valid PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.

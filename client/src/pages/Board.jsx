@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, BriefcaseBusiness, CalendarDays, FileText, GripVertical, Mail, MoreHorizontal, Pencil, Plus, Search, Sparkles, Trash2, WandSparkles } from "lucide-react";
 import toast from "react-hot-toast";
-import { api } from "@/lib/api";
+import { api, streamApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,7 +26,21 @@ function priorityStyle(priority) {
   return `priority-${priority.toLowerCase()}`;
 }
 
-function ApplicationCard({ application, index, token, onEdit, onDelete, onAI }) {
+function LoadingDots() {
+  return <span className="inline-flex items-center gap-1" aria-hidden="true">{[0, 1, 2].map((index) => <motion.span key={index} className="size-1 rounded-full bg-current" animate={{ opacity: [.25, 1, .25], y: [0, -2, 0] }} transition={{ duration: .9, repeat: Infinity, delay: index * .16 }} />)}</span>;
+}
+
+function AiSkeleton({ kind }) {
+  const widths = kind === "follow-up" ? ["42%", "88%", "96%", "76%", "91%", "64%"] : ["92%", "78%", "95%", "72%", "88%"];
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ai-result-panel space-y-3 rounded-xl p-5" aria-label="Generating AI response">
+    {widths.map((width, index) => <motion.div key={width + index} className="h-3 rounded-full bg-accent-soft" style={{ width }} animate={{ opacity: [.35, .85, .35] }} transition={{ duration: 1.35, repeat: Infinity, delay: index * .09 }} />)}
+  </motion.div>;
+}
+
+function ApplicationCard({ application, index, token, onEdit, onDelete, onAI, activeAI }) {
+  const aiBusy = Boolean(activeAI?.loading);
+  const emailBusy = aiBusy && activeAI.application?._id === application._id && activeAI.kind === "follow-up";
+  const tipsBusy = aiBusy && activeAI.application?._id === application._id && activeAI.kind === "tips";
   async function openResume() {
     try {
       const { url } = await api(`/applications/${application._id}/resume`, { token });
@@ -45,8 +59,8 @@ function ApplicationCard({ application, index, token, onEdit, onDelete, onAI }) 
       <div className="mt-4 flex items-center gap-2 text-xs text-subtle"><CalendarDays size={13} /><span>Applied {dateLabel(application.dateApplied)}</span></div>
       {(application.jobUrl || application.resumeName) && <div className="mt-3 flex items-center gap-3 text-xs">{application.jobUrl && <a href={application.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:text-accent">Job post <ArrowUpRight size={12} /></a>}{application.resumeName && <button onClick={openResume} className="inline-flex items-center gap-1 text-muted hover:text-[var(--text)]"><FileText size={12} /> Resume</button>}</div>}
       <div className="mt-4 flex items-center gap-1 border-t border-theme pt-3">
-        <button onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft"><Sparkles size={13} /> AI email</button>
-        <button onClick={() => onAI(application, "tips")} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)]"><WandSparkles size={13} /> Tips</button>
+        <button disabled={aiBusy} aria-busy={emailBusy} onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45">{emailBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Sparkles size={13} />} {emailBusy ? "Generating" : "AI email"}</button>
+        <button disabled={aiBusy} aria-busy={tipsBusy} onClick={() => onAI(application, "tips")} aria-label={`Generate interview tips for ${application.company}`} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-45">{tipsBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <WandSparkles size={13} />} {tipsBusy ? "Preparing" : "Tips"}</button>
         <div className="ml-auto flex items-center"><button onClick={() => onEdit(application)} title="Edit" aria-label={`Edit ${application.company}`} className="glass-action rounded-lg p-1.5"><Pencil size={13} /></button><button onClick={() => onDelete(application)} title="Delete" aria-label={`Delete ${application.company}`} className="rounded-lg p-1.5 text-faint hover:bg-[color-mix(in_srgb,var(--rejected)_12%,transparent)] hover:text-[var(--rejected)]"><Trash2 size={13} /></button></div>
       </div>
     </Card>}
@@ -57,19 +71,41 @@ export default function Board({ applications, loading, token, userName = "", onC
   const [search, setSearch] = useState("");
   const [ai, setAI] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const aiRequest = useRef(null);
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const filtered = useMemo(() => applications.filter((application) => `${application.company} ${application.role}`.toLowerCase().includes(search.toLowerCase())), [applications, search]);
   const responseRate = applications.length ? Math.round(applications.filter((application) => application.status !== "Applied").length / applications.length * 100) : 0;
 
+  useEffect(() => () => aiRequest.current?.abort(), []);
+
   async function runAI(application, kind) {
-    setAI({ application, kind, loading: true, result: "" });
+    if (ai?.loading) return;
+    aiRequest.current?.abort();
+    const controller = new AbortController();
+    const requestId = `${application._id}-${kind}-${Date.now()}`;
+    aiRequest.current = controller;
+    setAI({ application, kind, requestId, loading: true, result: "", status: kind === "follow-up" ? "Generating your email" : "Preparing interview tips" });
     try {
-      const endpoint = kind === "follow-up" ? "/ai/generate-email" : `/ai/${application._id}/tips`;
+      const endpoint = kind === "follow-up" ? "/ai/generate-email/stream" : `/ai/${application._id}/tips/stream`;
       const body = kind === "follow-up" ? { applicationId: application._id } : undefined;
-      const { result, source } = await api(endpoint, { token, method: "POST", body });
-      setAI({ application, kind, loading: false, result, source });
+      await streamApi(endpoint, {
+        token,
+        body,
+        signal: controller.signal,
+        onEvent: (event) => setAI((current) => {
+          if (!current || current.requestId !== requestId) return current;
+          if (event.type === "status") return { ...current, status: event.message || current.status };
+          if (event.type === "source") return { ...current, source: event.source, providerStatus: event.providerStatus };
+          if (event.type === "chunk") return { ...current, result: `${current.result || ""}${event.text || ""}` };
+          if (event.type === "done") return { ...current, loading: false, source: event.source || current.source };
+          return current;
+        })
+      });
+      setAI((current) => current?.requestId === requestId ? { ...current, loading: false } : current);
     } catch (error) {
-      setAI({ application, kind, loading: false, error: error.message });
+      if (error?.name !== "AbortError") setAI((current) => current?.requestId === requestId ? { ...current, loading: false, error: error.message } : current);
+    } finally {
+      if (aiRequest.current === controller) aiRequest.current = null;
     }
   }
 
@@ -103,7 +139,7 @@ export default function Board({ applications, loading, token, userName = "", onC
         return <Droppable key={column.name} droppableId={column.name}>{(provided, snapshot) => <div className={`board-lane min-w-0 rounded-2xl p-3.5 ${dragging ? "board-lane-dragging" : ""} ${snapshot.isDraggingOver ? "board-lane-over" : ""}`}>
           <div className="mb-4 flex items-center gap-2.5 px-1"><span className={`size-2 rounded-full status-dot-${column.tone}`} /><h3 className="text-sm font-semibold">{column.name}</h3><span className={`status-${column.tone} ml-auto rounded-lg px-2 py-0.5 text-xs font-semibold`}>{items.length}</span></div>
           <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[180px] rounded-xl transition-colors ${snapshot.isDraggingOver ? "drag-over" : ""}`}>
-            {items.length ? items.map((application, index) => <ApplicationCard key={application._id} application={application} index={index} token={token} onEdit={onEdit} onDelete={onDelete} onAI={runAI} />) : <div className="drop-empty flex min-h-[175px] flex-col items-center justify-center rounded-xl text-center"><span className={`status-${column.tone} mb-3 flex size-9 items-center justify-center rounded-xl`}><BriefcaseBusiness size={16} /></span><p className="text-xs font-medium text-subtle">No applications here</p><p className="mt-1 text-[11px] text-faint">Drop a card to move it</p></div>}
+            {items.length ? items.map((application, index) => <ApplicationCard key={application._id} application={application} index={index} token={token} onEdit={onEdit} onDelete={onDelete} onAI={runAI} activeAI={ai} />) : <div className="drop-empty flex min-h-[175px] flex-col items-center justify-center rounded-xl text-center"><span className={`status-${column.tone} mb-3 flex size-9 items-center justify-center rounded-xl`}><BriefcaseBusiness size={16} /></span><p className="text-xs font-medium text-subtle">No applications here</p><p className="mt-1 text-[11px] text-faint">Drop a card to move it</p></div>}
             {provided.placeholder}
           </div>
         </div>}</Droppable>;
@@ -111,6 +147,31 @@ export default function Board({ applications, loading, token, userName = "", onC
     </DragDropContext>}
     {!loading && applications.length === 0 && <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-[var(--accent-border)] bg-accent-soft p-8 text-center"><span className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent"><Plus size={20} /></span><h3 className="mt-3 font-semibold">Your journey starts with one application</h3><p className="mt-1 text-sm text-subtle">Add your first opportunity and watch your pipeline come to life.</p><Button className="mt-5" onClick={onCreate}><Plus size={15} /> Add your first application</Button></div>}
 
-    <Dialog open={Boolean(ai)} onOpenChange={(open) => { if (!open) setAI(null); }}><DialogContent className="ai-dialog" overlayClassName="ai-overlay"><div className="mb-5 pr-8"><div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent">{ai?.kind === "tips" ? <WandSparkles size={20} /> : <Mail size={20} />}</div><DialogTitle className="text-xl font-bold">{ai?.kind === "tips" ? "Interview tips" : "Follow-up email"}</DialogTitle><DialogDescription className="mt-1.5 text-sm text-muted">For {ai?.application?.role} at {ai?.application?.company}</DialogDescription></div>{ai?.loading ? <div className="ai-result-panel flex items-center gap-3 rounded-xl p-5 text-sm text-muted"><span className="size-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /> Thinking through your application…</div> : ai?.error ? <div role="alert" className="space-y-4"><div className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm text-main">{ai.error}</div><div className="flex justify-end"><Button variant="secondary" onClick={() => runAI(ai.application, ai.kind)}>Try again</Button></div></div> : <>{ai?.source === "preview" && <p className="mb-3 rounded-xl border border-[var(--accent-border)] bg-accent-soft px-4 py-3 text-xs leading-relaxed text-muted">Demo preview. Live Gemini generation activates when GEMINI_API_KEY is configured and quota is available.</p>}<div className="ai-result-panel max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl p-5 text-sm leading-relaxed text-main">{ai?.result}</div><div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => { navigator.clipboard.writeText(ai?.result || ""); toast.success("Copied to clipboard"); }}>Copy text</Button></div></>}</DialogContent></Dialog>
+    <Dialog open={Boolean(ai)} onOpenChange={(open) => { if (!open && !ai?.loading) setAI(null); }}>
+      <DialogContent className="ai-dialog" overlayClassName="ai-overlay" aria-busy={ai?.loading}>
+        <div className="mb-5 pr-8">
+          <motion.div animate={ai?.loading ? { scale: [1, 1.06, 1] } : { scale: 1 }} transition={{ duration: 1.5, repeat: ai?.loading ? Infinity : 0 }} className="mb-3 flex size-10 items-center justify-center rounded-xl bg-accent-soft text-accent">{ai?.kind === "tips" ? <WandSparkles size={20} /> : <Mail size={20} />}</motion.div>
+          <DialogTitle className="text-xl font-bold">{ai?.kind === "tips" ? "Interview tips" : "Follow-up email"}</DialogTitle>
+          <DialogDescription className="mt-1.5 text-sm text-muted">For {ai?.application?.role} at {ai?.application?.company}</DialogDescription>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {ai?.error ? <motion.div key="error" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} role="alert" className="space-y-4">
+            <div className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm text-main">{ai.error}</div>
+            <div className="flex justify-end"><Button variant="secondary" onClick={() => runAI(ai.application, ai.kind)}>Try again</Button></div>
+          </motion.div> : <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            {ai?.loading && <div className="flex items-center gap-2 text-sm font-medium text-accent" role="status">
+              <motion.span className="size-4 rounded-full border-2 border-[var(--accent)] border-t-transparent" animate={{ rotate: 360 }} transition={{ duration: .8, repeat: Infinity, ease: "linear" }} />
+              <span>{ai.status || (ai.kind === "tips" ? "Preparing interview tips" : "Generating your email")}</span><LoadingDots />
+            </div>}
+            {ai?.source === "preview" && <p className="rounded-xl border border-[var(--accent-border)] bg-accent-soft px-4 py-3 text-xs leading-relaxed text-muted">Demo preview. Live Gemini generation activates when GEMINI_API_KEY is configured and quota is available.</p>}
+            {ai?.loading && !ai?.result ? <AiSkeleton kind={ai.kind} /> : <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="ai-result-panel max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl p-5 text-sm leading-relaxed text-main">
+              {ai?.result}<AnimatePresence>{ai?.loading && <motion.span initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0] }} exit={{ opacity: 0 }} transition={{ duration: .7, repeat: Infinity }} className="ml-1 inline-block h-4 w-0.5 translate-y-0.5 bg-[var(--accent)]" />}</AnimatePresence>
+            </motion.div>}
+            {!ai?.loading && ai?.result && <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end"><Button variant="secondary" onClick={() => { navigator.clipboard.writeText(ai.result || ""); toast.success("Copied to clipboard"); }}>Copy text</Button></motion.div>}
+          </motion.div>}
+        </AnimatePresence>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
