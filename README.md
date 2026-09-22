@@ -45,7 +45,8 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `MONGODB_URI` | MongoDB connection string |
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
-| `OPENAI_API_KEY` | Enables follow-up emails and interview tips |
+| `OPENAI_API_KEY` | Optional direct OpenAI credential for follow-up emails and interview tips |
+| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway credential outside Vercel |
 | `OPENAI_MODEL` | GPT-4 family model; defaults to `gpt-4o` |
 | `AI_DEMO_MODE` | `true` enables labeled local preview output when no OpenAI key is set; unavailable in production |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
@@ -54,7 +55,7 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without an OpenAI key, `dev:local` and Docker Compose return labeled example output for AI actions. Production requires `OPENAI_API_KEY`; the local preview does not make an OpenAI request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+Without an OpenAI key, `dev:local` and Docker Compose return labeled example output for AI actions. On Vercel, the API uses the deployment's automatic OIDC token with Vercel AI Gateway and the configured OpenAI model; a direct `OPENAI_API_KEY` takes precedence. The local preview does not make an OpenAI request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ## Deployment
 
@@ -62,7 +63,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Add `OPENAI_API_KEY` to enable live Follow-up and Tips generation. `OPENAI_MODEL` defaults to `gpt-4o`.
+3. Vercel deployments use OIDC with AI Gateway for live Follow-up and Tips generation. Add `OPENAI_API_KEY` only when direct OpenAI billing is preferred. `OPENAI_MODEL` defaults to `gpt-4o`.
 4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
 5. Redeploy after changing environment variables.
 
