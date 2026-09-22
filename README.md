@@ -9,7 +9,7 @@ The interface uses teal glass panels and supports day and night modes. The sign-
 ## Stack
 
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
-- API: Node.js, Express 5, MongoDB with Mongoose, JWT, bcrypt, OpenAI API, AWS S3, Socket.io
+- API: Node.js, Express 5, MongoDB with Mongoose, JWT, bcrypt, Google Gemini API, AWS S3, Socket.io
 - Local containers: Docker Compose with MongoDB, API, and Vite client
 - Production: Vercel for the Vite client and Express API, MongoDB Atlas for persistent data
 - Alternative API host: Render configuration is included in `render.yaml`
@@ -26,17 +26,17 @@ cp client/.env.example client/.env
 pnpm dev
 ```
 
-If MongoDB and Docker are not installed, use `pnpm dev:local` instead. On its first run, this development-only command downloads a MongoDB binary and starts it with data stored in `server/.local/db`. The local JWT secret is generated in `server/.local/jwt-secret`. Resume PDFs are stored privately in `server/.local/resumes` unless an S3 bucket is configured. These files are ignored by Git. `pnpm dev:local` starts the client and API together; no `.env` files are required for local resume uploads. For live Follow-up and Tips responses, add `OPENAI_API_KEY=your-key` to `server/.env` and restart `pnpm dev:local`. Without a key, these actions show clearly labeled example output for local demos.
+If MongoDB and Docker are not installed, use `pnpm dev:local` instead. On its first run, this development-only command downloads a MongoDB binary and starts it with data stored in `server/.local/db`. The local JWT secret is generated in `server/.local/jwt-secret`. Resume PDFs are stored privately in `server/.local/resumes` unless an S3 bucket is configured. These files are ignored by Git. `pnpm dev:local` starts the client and API together; no `.env` files are required for local resume uploads. For live Follow-up and Tips responses, add `GEMINI_API_KEY=your-key` to `server/.env` and restart `pnpm dev:local`. Without a key, these actions show clearly labeled example output for local demos.
 
 Edit `server/.env` before starting: set a random `JWT_SECRET` with at least 32 characters and a reachable `MONGODB_URI`. The client is at `http://localhost:5173`; the API is at `http://localhost:4000/api`.
 
-For Docker, set an OpenAI key in an untracked `.env` in this folder if you want AI features, then run:
+For Docker, set a Gemini API key in an untracked `.env` in this folder if you want live AI features, then run:
 
 ```bash
 docker compose up --build
 ```
 
-The Compose file supplies a local MongoDB URL and a development JWT secret. It stores resume PDFs in a persistent Docker volume and enables labeled AI previews by default. To use AWS S3 in Docker, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `OPENAI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development. Docker is not needed to run the apps directly.
+The Compose file supplies a local MongoDB URL and a development JWT secret. It stores resume PDFs in a persistent Docker volume and enables labeled AI previews by default. To use AWS S3 in Docker, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `GEMINI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development. Docker is not needed to run the apps directly.
 
 ## Environment variables
 
@@ -45,9 +45,8 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `MONGODB_URI` | MongoDB connection string |
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
-| `OPENAI_API_KEY` | Optional direct OpenAI credential for follow-up emails and interview tips |
-| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway credential outside Vercel |
-| `OPENAI_MODEL` | GPT-4 family model; defaults to `gpt-4o` |
+| `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails and interview tips |
+| `GEMINI_MODEL` | Gemini model; defaults to `gemini-2.5-flash` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
@@ -55,7 +54,7 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without an OpenAI key, `dev:local` and Docker Compose return labeled example output for AI actions. On Vercel, the API uses the deployment's automatic OIDC token with Vercel AI Gateway and the configured OpenAI model; a direct `OPENAI_API_KEY` takes precedence. The local preview does not make an OpenAI request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. The local preview does not make a Gemini request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ## Deployment
 
@@ -63,7 +62,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Vercel deployments can use OIDC with AI Gateway for live Follow-up and Tips generation. Add `OPENAI_API_KEY` for direct OpenAI access. `OPENAI_MODEL` defaults to `gpt-4o`.
+3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up and Tips generation. `GEMINI_MODEL` defaults to `gemini-2.5-flash`.
 4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
 5. Redeploy after changing environment variables.
 

@@ -8,7 +8,7 @@ const localDir = path.resolve(import.meta.dirname, "../.local");
 const dbPath = path.join(localDir, "db");
 const secretPath = path.join(localDir, "jwt-secret");
 process.env.RESUME_STORAGE ||= process.env.AWS_S3_BUCKET ? "s3" : "local";
-process.env.AI_DEMO_MODE ||= process.env.OPENAI_API_KEY ? "false" : "true";
+process.env.AI_DEMO_MODE ||= process.env.GEMINI_API_KEY ? "false" : "true";
 
 await mkdir(dbPath, { recursive: true });
 if (!process.env.JWT_SECRET) {
