@@ -1,0 +1,11 @@
+{
+  "name": "applywise",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter @applywise/client --filter @applywise/server dev",
+    "dev:local": "pnpm --parallel --filter @applywise/client --filter @applywise/server dev:local",
+    "build": "pnpm --filter @applywise/client build",
+    "check": "pnpm --filter @applywise/client build && pnpm --filter @applywise/server test"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
