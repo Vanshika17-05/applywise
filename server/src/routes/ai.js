@@ -23,6 +23,10 @@ function aiClient() {
   };
 }
 
+function previewResponse(res, application, kind) {
+  return res.json({ result: generateAiPreview(application, kind), source: "preview" });
+}
+
 router.post("/:id/:kind", async (req, res, next) => {
   try {
     const kind = req.params.kind;
@@ -31,9 +35,7 @@ router.post("/:id/:kind", async (req, res, next) => {
     if (!application) return res.status(404).json({ error: "Application not found" });
     const provider = aiClient();
     if (!provider) {
-      if (process.env.NODE_ENV !== "production" && process.env.AI_DEMO_MODE === "true") {
-        return res.json({ result: generateAiPreview(application, kind), source: "preview" });
-      }
+      if (process.env.AI_DEMO_MODE === "true") return previewResponse(res, application, kind);
       return res.status(503).json({ error: "AI is unavailable. Configure OpenAI or Vercel AI Gateway credentials on the server." });
     }
     const context = `Company: ${application.company}\nRole: ${application.role}\nApplied: ${application.dateApplied.toISOString().slice(0, 10)}\nStatus: ${application.status}`;
@@ -52,6 +54,10 @@ router.post("/:id/:kind", async (req, res, next) => {
     res.json({ result: completion.choices[0]?.message?.content?.trim() || "No response was generated.", source: provider.source });
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
+      if (process.env.AI_DEMO_MODE === "true") {
+        const application = await Application.findOne({ _id: req.params.id, user: req.userId });
+        if (application) return previewResponse(res, application, req.params.kind);
+      }
       const message = error.status === 401 || error.status === 403
         ? "The AI provider rejected the server credentials. Check the deployment configuration."
         : error.status === 429 ? "AI generation is rate limited or out of credits. Try again later."

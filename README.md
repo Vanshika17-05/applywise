@@ -48,7 +48,7 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `OPENAI_API_KEY` | Optional direct OpenAI credential for follow-up emails and interview tips |
 | `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway credential outside Vercel |
 | `OPENAI_MODEL` | GPT-4 family model; defaults to `gpt-4o` |
-| `AI_DEMO_MODE` | `true` enables labeled local preview output when no OpenAI key is set; unavailable in production |
+| `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
 | `RESUME_STORAGE` | `local` for development files, `s3` for AWS S3; `dev:local` selects local storage when no S3 bucket is set |
