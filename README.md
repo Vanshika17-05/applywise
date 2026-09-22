@@ -2,7 +2,7 @@
 
 A job application tracker with a Kanban pipeline, AI career assistance, analytics, private resume uploads, and live status notifications.
 
-Frontend: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). API-backed features require the deployed Express service and `VITE_API_URL` configuration described below.
+Live app and API: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). Vercel serves the Vite client and the Express REST API from the same origin.
 
 The interface uses teal glass panels and supports day and night modes. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
 
@@ -11,7 +11,8 @@ The interface uses teal glass panels and supports day and night modes. The sign-
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
 - API: Node.js, Express 5, MongoDB with Mongoose, JWT, bcrypt, OpenAI API, AWS S3, Socket.io
 - Local containers: Docker Compose with MongoDB, API, and Vite client
-- Deployment targets: Vercel for the client and Render for the API
+- Production: Vercel for the Vite client and Express API, MongoDB Atlas for persistent data
+- Alternative API host: Render configuration is included in `render.yaml`
 
 ## Quick start
 
@@ -50,16 +51,22 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
 | `RESUME_STORAGE` | `local` for development files, `s3` for AWS S3; `dev:local` selects local storage when no S3 bucket is set |
-| `VITE_API_URL` | Public API origin for the Vite client, without `/api` |
+| `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
+| `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
 Without an OpenAI key, `dev:local` and Docker Compose return labeled example output for AI actions. Production requires `OPENAI_API_KEY`; the local preview does not make an OpenAI request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ## Deployment
 
-1. Create a MongoDB Atlas database and a private S3 bucket. Put credentials in Render environment variables, never in the repository.
-2. Deploy the API with the included `render.yaml` Blueprint. Set `MONGODB_URI`, `CLIENT_ORIGIN`, `OPENAI_API_KEY`, and AWS variables during setup. Render generates `JWT_SECRET`.
-3. Import this repository into Vercel. Set the project Root Directory to `applywise/client` if the repository root is the parent workspace, or `client` if `applywise` is the repository root. Use the Vite framework preset and set `VITE_API_URL` to the Render service's HTTPS origin.
-4. Set `CLIENT_ORIGIN` on Render to the final Vercel origin. Redeploy both services after environment changes.
+The current production deployment uses the root `vercel.json`. It builds `client/dist`, exposes Express through `api/index.js`, and rewrites `/api/*` to that function. MongoDB Atlas is connected through the Vercel Marketplace and supplies `MONGODB_URI`.
+
+1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
+2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
+3. Add `OPENAI_API_KEY` to enable live Follow-up and Tips generation. `OPENAI_MODEL` defaults to `gpt-4o`.
+4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
+5. Redeploy after changing environment variables.
+
+The application saves accounts, profile preferences, and applications in MongoDB Atlas. Status changes always update through the REST API and show a toast. For cross-client Socket.io events in production, set `VITE_SOCKET_URL` to a persistent Socket.io service; local Docker and Node development use the included Socket.io server directly.
 
 ## API
 
