@@ -46,7 +46,7 @@ The Compose file supplies a local MongoDB URL and a development JWT secret. It s
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails and interview tips |
-| `GEMINI_MODEL` | Gemini model; defaults to `gemini-3.1-flash-lite` |
+| `GEMINI_MODEL` | Gemini model; defaults to `gemini-3.5-flash` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
@@ -62,7 +62,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up and Tips generation. `GEMINI_MODEL` defaults to the stable free-tier model `gemini-3.1-flash-lite`.
+3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up and Tips generation. `GEMINI_MODEL` defaults to the stable free-tier model `gemini-3.5-flash`.
 4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
 5. Redeploy after changing environment variables.
 

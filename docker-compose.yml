@@ -24,7 +24,7 @@ services:
       MONGODB_URI: mongodb://mongo:27017/applywise
       JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-before-deployment-12345}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
       AI_DEMO_MODE: ${AI_DEMO_MODE:-true}
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
