@@ -24,8 +24,8 @@ function aiClient() {
   };
 }
 
-function preview(application, kind) {
-  return { result: generateAiPreview(application, kind), source: "preview" };
+function preview(application, kind, providerStatus) {
+  return { result: generateAiPreview(application, kind), source: "preview", ...(providerStatus ? { providerStatus } : {}) };
 }
 
 async function applicationForUser(id, userId) {
@@ -59,7 +59,10 @@ async function generate(application, kind) {
     });
     return { result: completion.choices[0]?.message?.content?.trim() || "No response was generated.", source: provider.source };
   } catch (error) {
-    if (error instanceof OpenAI.APIError && process.env.AI_DEMO_MODE === "true") return preview(application, kind);
+    if (error instanceof OpenAI.APIError && process.env.AI_DEMO_MODE === "true") {
+      console.warn("AI provider request failed; returning labeled preview", { provider: provider.source, status: error.status, code: error.code, type: error.type });
+      return preview(application, kind, error.status);
+    }
     throw error;
   }
 }
@@ -79,7 +82,7 @@ router.post("/generate-email", async (req, res, next) => {
     const application = await applicationForUser(req.body?.applicationId, req.userId);
     if (!application) return res.status(404).json({ error: "Application not found" });
     const output = await generate(application, "follow-up");
-    return res.json({ email: output.result, result: output.result, source: output.source });
+    return res.json({ email: output.result, ...output });
   } catch (error) { return handleError(error, next, res); }
 });
 
