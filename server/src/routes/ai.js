@@ -12,11 +12,11 @@ router.use(rateLimit({ windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "dr
 
 function aiClient() {
   if (process.env.OPENAI_API_KEY) {
-    return { client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), model: process.env.OPENAI_MODEL || "gpt-4", source: "openai" };
+    return { client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), model: process.env.OPENAI_MODEL || "gpt-4o", source: "openai" };
   }
   const gatewayToken = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
   if (!gatewayToken) return null;
-  const configuredModel = process.env.OPENAI_MODEL || "gpt-4";
+  const configuredModel = process.env.OPENAI_MODEL || "gpt-4o";
   return {
     client: new OpenAI({ apiKey: gatewayToken, baseURL: "https://ai-gateway.vercel.sh/v1" }),
     model: configuredModel.includes("/") ? configuredModel : `openai/${configuredModel}`,
