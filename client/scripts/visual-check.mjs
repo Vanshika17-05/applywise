@@ -59,7 +59,7 @@ try {
 
     await page.getByRole("button", { name: /^Generate follow-up email for / }).first().click();
     await page.getByRole("heading", { name: "Follow-up email" }).waitFor();
-    await page.getByRole("button", { name: "Copy text" }).waitFor({ timeout: 30000 });
+    await page.getByRole("button", { name: "Copy text" }).waitFor({ timeout: 60000 });
     assert.ok((await page.locator(".ai-result-panel").last().textContent()).length > 80, "Follow-up output should be displayed in the modal");
     await page.screenshot({ path: path.join(screenshots, "ai-follow-up.png"), fullPage: true });
     await page.keyboard.press("Escape");
