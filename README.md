@@ -2,6 +2,8 @@
 
 A job application tracker with a Kanban pipeline, AI career assistance, analytics, private resume uploads, and live status notifications.
 
+Frontend: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). API-backed features require the deployed Express service and `VITE_API_URL` configuration described below.
+
 The interface uses teal glass panels and supports day and night modes. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
 
 ## Stack
