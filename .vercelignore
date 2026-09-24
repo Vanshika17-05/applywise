@@ -1,0 +1,10 @@
+node_modules/
+**/node_modules/
+client/dist/
+server/.local/
+.screenshots/
+.git/
+.env
+.env.*
+coverage/
+*.log
