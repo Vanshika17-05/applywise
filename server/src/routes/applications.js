@@ -127,6 +127,33 @@ router.get("/:id/resume", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post("/quick", async (req, res, next) => {
+  try {
+    const quickSchema = z.object({
+      company: z.string().trim().min(1).max(120),
+      role: z.string().trim().min(1).max(120),
+      jobUrl: z.union([z.literal(""), z.string().url().max(2048)]).default(""),
+      notes: z.string().max(5000).default(""),
+      priority: z.enum(PRIORITIES).default("Medium"),
+      status: z.enum(STATUSES).default("Applied"),
+      dateApplied: z.coerce.date().default(() => new Date())
+    });
+    const parsed = quickSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+    const application = await Application.create({
+      ...parsed.data,
+      userId: req.user.id
+    });
+    await invalidateAnalyticsCache(req.user.id);
+    req.app.get("io")?.to(`user:${req.user.id}`).emit("application:created", {
+      applicationId: application.id,
+      company: application.company,
+      role: application.role
+    });
+    res.status(201).json({ application });
+  } catch (error) { next(error); }
+});
+
 router.delete("/:id", async (req, res, next) => {
   try {
     const application = await Application.findOneAndDelete({ _id: req.params.id, userId: req.user.id }).select("+resumeKey");

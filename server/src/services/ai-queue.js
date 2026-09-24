@@ -28,16 +28,18 @@ export function getAiQueue() {
   return queue;
 }
 
-export async function enqueueAiJob(userId, application, kind) {
+export async function enqueueAiJob(userId, application, kind, extra = {}) {
   const job = await getAiQueue().add(kind, {
     userId,
     kind,
+    extra,
     application: {
       id: application.id,
       company: application.company,
       role: application.role,
       dateApplied: application.dateApplied.toISOString(),
-      status: application.status
+      status: application.status,
+      notes: application.notes || ""
     }
   });
   return job.id;

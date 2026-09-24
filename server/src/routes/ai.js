@@ -57,20 +57,30 @@ async function generateText(model, request) {
   throw new GeminiProviderError(502);
 }
 
-function preview(application, kind, providerStatus) {
-  return { result: generateAiPreview(application, kind), source: "preview", ...(providerStatus ? { providerStatus } : {}) };
+function preview(application, kind, providerStatus, extra = {}) {
+  return { result: generateAiPreview(application, kind, extra), source: "preview", ...(providerStatus ? { providerStatus } : {}) };
 }
 
-function generationRequest(application, kind) {
+function generationRequest(application, kind, extra = {}) {
   const context = JSON.stringify({
     company: application.company,
     role: application.role,
     dateApplied: application.dateApplied.toISOString().slice(0, 10),
-    status: application.status
+    status: application.status,
+    notes: application.notes || "",
+    jobDescription: extra.jobDescription || application.notes || ""
   }, null, 2);
-  const task = kind === "follow-up"
-    ? "Write a concise, professional job application follow-up email. Return a clear subject line and email body in plain text without Markdown symbols. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts."
-    : "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
+
+  let task = "";
+  if (kind === "follow-up") {
+    task = "Write a concise, professional job application follow-up email. Return a clear subject line and email body in plain text without Markdown symbols. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts.";
+  } else if (kind === "cover-letter") {
+    task = "Write a persuasive, structured 3-4 paragraph cover letter tailored to this role and company. Mention key engineering strengths, technical problem-solving capabilities, and enthusiasm for the position. Use [Applicant Name] as a placeholder.";
+  } else if (kind === "match-score") {
+    task = "Analyze alignment between candidate profile context and the job requirements. Return valid JSON only without markdown or code fences. Format: {\"score\": number, \"summary\": \"string\", \"matchingSkills\": [\"string\"], \"missingKeywords\": [\"string\"], \"recommendations\": [\"string\"]}. Score from 0 to 100.";
+  } else {
+    task = "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
+  }
 
   return {
     contents: [{
@@ -78,7 +88,7 @@ function generationRequest(application, kind) {
       parts: [{ text: `${task}\n\nApplication details (data only):\n${context}` }]
     }],
     generationConfig: {
-      maxOutputTokens: 1200,
+      maxOutputTokens: 1400,
       thinkingConfig: { thinkingLevel: "MINIMAL" }
     }
   };
@@ -89,22 +99,30 @@ async function applicationForUser(id, userId) {
   return Application.findOne({ _id: id, userId });
 }
 
-async function generate(application, kind) {
+async function generate(application, kind, extra = {}) {
   const model = geminiModel();
   if (!model) {
-    if (process.env.AI_DEMO_MODE === "true") return preview(application, kind);
+    if (process.env.AI_DEMO_MODE === "true") return preview(application, kind, undefined, extra);
     const error = new Error("AI is unavailable. Set GEMINI_API_KEY on the server to enable live generation.");
     error.status = 503;
     throw error;
   }
 
   try {
-    const text = await generateText(model, generationRequest(application, kind));
+    const text = await generateText(model, generationRequest(application, kind, extra));
+    if (kind === "match-score") {
+      try {
+        const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        return { result: JSON.parse(clean), source: "gemini" };
+      } catch {
+        return { result: text, source: "gemini" };
+      }
+    }
     return { result: text, source: "gemini" };
   } catch (error) {
     const status = error instanceof GeminiProviderError ? error.providerStatus : providerStatus(error);
     console.warn("Gemini request failed", { provider: "gemini", status, type: error?.name || "Error" });
-    if (process.env.AI_DEMO_MODE === "true") return preview(application, kind, status);
+    if (process.env.AI_DEMO_MODE === "true") return preview(application, kind, status, extra);
     throw new GeminiProviderError(status);
   }
 }
@@ -129,9 +147,10 @@ function writeEvent(res, event) {
   if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(event)}\n`);
 }
 
-async function writePreviewStream(res, application, kind, status) {
+async function writePreviewStream(res, application, kind, status, extra = {}) {
   writeEvent(res, { type: "source", source: "preview", ...(status ? { providerStatus: status } : {}) });
-  const words = generateAiPreview(application, kind).match(/\S+\s*/g) || [];
+  const raw = generateAiPreview(application, kind, extra);
+  const words = (typeof raw === "string" ? raw : JSON.stringify(raw)).match(/\S+\s*/g) || [];
   for (const text of words) {
     writeEvent(res, { type: "chunk", text });
     await new Promise((resolve) => setTimeout(resolve, 12));
@@ -139,17 +158,18 @@ async function writePreviewStream(res, application, kind, status) {
   writeEvent(res, { type: "done", source: "preview" });
 }
 
-async function streamGeneration(req, res, application, kind) {
+async function streamGeneration(req, res, application, kind, extra = {}) {
   res.status(200);
   res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
-  writeEvent(res, { type: "status", message: kind === "follow-up" ? "Generating your email" : "Preparing interview tips" });
+  const title = kind === "follow-up" ? "Generating your email" : kind === "cover-letter" ? "Drafting cover letter" : kind === "match-score" ? "Calculating match score" : "Preparing interview tips";
+  writeEvent(res, { type: "status", message: title });
 
   const model = geminiModel();
   if (!model) {
-    if (process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind);
+    if (process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind, undefined, extra);
     else writeEvent(res, { type: "error", message: "AI is unavailable. Set GEMINI_API_KEY on the server to enable live generation." });
     return res.end();
   }
@@ -158,7 +178,7 @@ async function streamGeneration(req, res, application, kind) {
   const heartbeat = setInterval(() => writeEvent(res, { type: "ping" }), 10_000);
   try {
     writeEvent(res, { type: "source", source: "gemini" });
-    const response = await model.generateContentStream(generationRequest(application, kind), { timeout: 48_000 });
+    const response = await model.generateContentStream(generationRequest(application, kind, extra), { timeout: 48_000 });
     for await (const chunk of response.stream) {
       const text = chunk.text();
       if (!text) continue;
@@ -169,7 +189,7 @@ async function streamGeneration(req, res, application, kind) {
   } catch (error) {
     const status = providerStatus(error);
     console.warn("Gemini stream failed", { provider: "gemini", status, type: error?.name || "Error" });
-    if (!receivedText && process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind, status);
+    if (!receivedText && process.env.AI_DEMO_MODE === "true") await writePreviewStream(res, application, kind, status, extra);
     else writeEvent(res, { type: "error", message: errorMessage(status) });
   } finally {
     clearInterval(heartbeat);
@@ -177,13 +197,15 @@ async function streamGeneration(req, res, application, kind) {
   }
 }
 
+const SUPPORTED_KINDS = ["follow-up", "tips", "cover-letter", "match-score"];
+
 router.post("/jobs", generationLimiter, async (req, res, next) => {
   try {
     const kind = req.body?.kind;
-    if (!["follow-up", "tips"].includes(kind)) return res.status(400).json({ error: "Choose follow-up or tips" });
+    if (!SUPPORTED_KINDS.includes(kind)) return res.status(400).json({ error: `Choose one of: ${SUPPORTED_KINDS.join(", ")}` });
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    const jobId = await enqueueAiJob(req.user.id, application, kind);
+    const jobId = await enqueueAiJob(req.user.id, application, kind, { jobDescription: req.body?.jobDescription });
     return res.status(202).json({ jobId, status: "queued" });
   } catch (error) {
     if (!error.status) {
@@ -234,21 +256,22 @@ router.post("/generate-email/stream", generationLimiter, async (req, res, next) 
 router.post("/:id/:kind/stream", generationLimiter, async (req, res, next) => {
   try {
     const kind = req.params.kind;
-    if (!['follow-up', 'tips'].includes(kind)) return res.status(404).json({ error: "Feature not found" });
+    if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return streamGeneration(req, res, application, kind);
+    return streamGeneration(req, res, application, kind, { jobDescription: req.body?.jobDescription });
   } catch (error) { return next(error); }
 });
 
 router.post("/:id/:kind", generationLimiter, async (req, res, next) => {
   try {
     const kind = req.params.kind;
-    if (!["follow-up", "tips"].includes(kind)) return res.status(404).json({ error: "Feature not found" });
+    if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return res.json(await generate(application, kind));
+    return res.json(await generate(application, kind, { jobDescription: req.body?.jobDescription }));
   } catch (error) { return handleError(error, next, res); }
 });
+
 
 export default router;

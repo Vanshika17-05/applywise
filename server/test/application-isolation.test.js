@@ -170,7 +170,23 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(insightsA.data.source, "preview");
   assert.equal(insightsA.data.insights.length, 3);
 
+  const coverLetter = await request(`/ai/${created[0]._id}/cover-letter`, { token: userA.token, method: "POST" });
+  assert.equal(coverLetter.response.status, 200);
+  assert.match(coverLetter.data.result, /Dear Hiring Team at User A Company 1/);
+
+  const matchScore = await request(`/ai/${created[0]._id}/match-score`, { token: userA.token, method: "POST", body: { jobDescription: "Looking for React Node engineer" } });
+  assert.equal(matchScore.response.status, 200);
+  assert.equal(typeof matchScore.data.result.score, "number");
+
+  const quickCreate = await request("/applications/quick", {
+    token: userA.token,
+    method: "POST",
+    body: { company: "Amazon", role: "Software Development Engineer", jobUrl: "https://amazon.jobs/123" }
+  });
+  assert.equal(quickCreate.response.status, 201);
+  assert.equal(quickCreate.data.application.company, "Amazon");
+
   const listA = await request("/applications", { token: userA.token });
   assert.equal(listA.response.status, 200);
-  assert.equal(listA.data.applications.length, 3, "User A's applications must remain intact");
+  assert.equal(listA.data.applications.length, 4, "User A's applications must include quick-create");
 });

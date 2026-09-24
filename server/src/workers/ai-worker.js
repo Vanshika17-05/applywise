@@ -11,9 +11,9 @@ function positiveInteger(value, fallback, maximum) {
 const concurrency = positiveInteger(process.env.AI_WORKER_CONCURRENCY, 4, 20);
 const rateLimit = positiveInteger(process.env.AI_WORKER_RATE_LIMIT, 20, 200);
 const worker = new Worker(AI_QUEUE_NAME, async (job) => {
-  if (!['follow-up', 'tips'].includes(job.data.kind)) throw new Error("Unsupported AI job type");
+  if (!['follow-up', 'tips', 'cover-letter', 'match-score'].includes(job.data.kind)) throw new Error("Unsupported AI job type");
   await job.updateProgress(10);
-  const output = await generateQueuedAi(job.data.application, job.data.kind);
+  const output = await generateQueuedAi(job.data.application, job.data.kind, job.data.extra || {});
   await job.updateProgress(100);
   return output;
 }, {

@@ -117,6 +117,16 @@ export async function readLocalResume(key) {
   return readFile(localPath(key));
 }
 
+export async function getResumeBuffer(key) {
+  if (!key) return null;
+  if (isLocalResume(key)) {
+    return readLocalResume(key);
+  }
+  const response = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  const byteArray = await response.Body.transformToByteArray();
+  return Buffer.from(byteArray);
+}
+
 export async function deleteResume(key) {
   if (!key) return;
   if (isLocalResume(key)) { await unlink(localPath(key)); return; }
