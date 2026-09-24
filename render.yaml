@@ -12,6 +12,8 @@ services:
         generateValue: true
       - key: MONGODB_URI
         sync: false
+      - key: REDIS_URL
+        sync: false
       - key: CLIENT_ORIGIN
         sync: false
       - key: GEMINI_API_KEY

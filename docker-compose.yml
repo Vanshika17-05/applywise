@@ -10,6 +10,18 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   server:
     build:
       context: .
@@ -22,6 +34,7 @@ services:
       PORT: 4000
       CLIENT_ORIGIN: http://localhost:5173
       MONGODB_URI: mongodb://mongo:27017/applywise
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-before-deployment-12345}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
@@ -35,6 +48,8 @@ services:
       - resume_data:/app/server/.local/resumes
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   client:
@@ -51,3 +66,4 @@ services:
 volumes:
   mongo_data:
   resume_data:
+  redis_data:

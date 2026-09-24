@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Application, STATUSES, PRIORITIES } from "../models/Application.js";
 import { authenticate } from "../middleware/auth.js";
 import { uploadResume, getResumeUrl, readLocalResume, isLocalResume, deleteResume } from "../services/s3.js";
+import { invalidateAnalyticsCache } from "../services/analytics-cache.js";
 
 const router = Router();
 router.get("/:id/resume/view", async (req, res, next) => {
@@ -58,6 +59,7 @@ router.delete("/", async (req, res, next) => {
       try { await deleteResume(application.resumeKey); }
       catch (error) { console.error("Could not remove application resume", error); }
     }));
+    await invalidateAnalyticsCache(req.user.id);
     res.json({ deletedCount });
   } catch (error) { next(error); }
 });
@@ -69,6 +71,7 @@ router.post("/", upload.single("resume"), async (req, res, next) => {
     if (req.file && !validPdf(req.file)) return res.status(400).json({ error: "Upload a valid PDF file" });
     const resumeKey = req.file ? await uploadResume(req.user.id, req.file) : undefined;
     const application = await Application.create({ ...data, userId: req.user.id, resumeKey, resumeName: req.file?.originalname || "" });
+    await invalidateAnalyticsCache(req.user.id);
     res.status(201).json({ application });
   } catch (error) { next(error); }
 });
@@ -83,6 +86,7 @@ router.patch("/:id", async (req, res, next) => {
     const previousStatus = application.status;
     Object.assign(application, data);
     await application.save();
+    await invalidateAnalyticsCache(req.user.id);
     if (previousStatus !== application.status) {
       req.app.get("io")?.to(`user:${req.user.id}`).emit("application:status", {
         applicationId: application.id, company: application.company, role: application.role, status: application.status
@@ -106,6 +110,7 @@ router.delete("/:id", async (req, res, next) => {
   try {
     const application = await Application.findOneAndDelete({ _id: req.params.id, userId: req.user.id }).select("+resumeKey");
     if (!application) return res.status(404).json({ error: "Application not found" });
+    await invalidateAnalyticsCache(req.user.id);
     try { await deleteResume(application.resumeKey); } catch (error) { console.error("Could not remove resume", error); }
     res.status(204).end();
   } catch (error) { next(error); }

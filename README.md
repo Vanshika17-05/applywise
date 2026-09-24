@@ -9,8 +9,8 @@ The interface uses teal glass panels and supports day and night modes. The sign-
 ## Stack
 
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
-- API: Node.js, Express 5, MongoDB with Mongoose, JWT, bcrypt, Google Gemini API, AWS S3, Socket.io
-- Local containers: Docker Compose with MongoDB, API, and Vite client
+- API: Node.js, Express 5, MongoDB aggregation pipelines with Mongoose, Redis, JWT, bcrypt, LangChain with Google Gemini, AWS S3, Socket.io
+- Local containers: Docker Compose with MongoDB, Redis, API, and Vite client
 - Production: Vercel for the Vite client and Express API, MongoDB Atlas for persistent data
 - Alternative API host: Render configuration is included in `render.yaml`
 
@@ -36,13 +36,14 @@ For Docker, set a Gemini API key in an untracked `.env` in this folder if you wa
 docker compose up --build
 ```
 
-The Compose file supplies a local MongoDB URL and a development JWT secret. It stores resume PDFs in a persistent Docker volume and enables labeled AI previews by default. To use AWS S3 in Docker, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `GEMINI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development. Docker is not needed to run the apps directly.
+The Compose file supplies local MongoDB and Redis services plus a development JWT secret. Redis caches each user's analytics response for five minutes and application mutations invalidate that user's cache version. Compose stores resume PDFs in a persistent Docker volume and enables labeled AI previews by default. To use AWS S3 in Docker, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `GEMINI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development. Docker is not needed to run the apps directly.
 
 ## Environment variables
 
 | Variable | Purpose |
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string |
+| `REDIS_URL` | Optional Redis connection URL for the five-minute analytics cache; Docker Compose configures this automatically |
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails and interview tips |
@@ -62,9 +63,10 @@ The current production deployment uses the root `vercel.json`. It builds `client
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up and Tips generation. `GEMINI_MODEL` defaults to the stable, low-latency free-tier model `gemini-3.5-flash-lite`.
-4. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
-5. Redeploy after changing environment variables.
+3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up, Tips, and LangChain career insight generation. `GEMINI_MODEL` defaults to the stable, low-latency free-tier model `gemini-3.5-flash-lite`.
+4. Add a managed Redis connection as `REDIS_URL` to enable the five-minute production analytics cache. The API remains available without Redis and reports a cache bypass.
+5. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
+6. Redeploy after changing environment variables.
 
 The application saves accounts, profile preferences, and applications in MongoDB Atlas. Status changes always update through the REST API and show a toast. For cross-client Socket.io events in production, set `VITE_SOCKET_URL` to a persistent Socket.io service; local Docker and Node development use the included Socket.io server directly.
 
@@ -81,6 +83,9 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `DELETE` | `/api/applications` | Delete all of the signed-in user's applications |
 | `PATCH`, `DELETE` | `/api/applications/:id` | Edit, move, or remove an application |
 | `GET` | `/api/applications/:id/resume` | Get a short lived private download URL |
+| `GET` | `/api/analytics` | Aggregated metrics, funnel, timeline, and heatmap with date-range filters |
+| `GET` | `/api/analytics/export` | Export the selected date range as CSV |
+| `POST` | `/api/analytics/insights` | Generate three LangChain and Gemini career insights from aggregated metrics |
 | `POST` | `/api/ai/:id/follow-up` | Generate follow-up email |
 | `POST` | `/api/ai/generate-email` | Generate a follow-up email from `{ applicationId }` |
 | `POST` | `/api/ai/generate-email/stream` | Stream a follow-up email as newline-delimited JSON events |
@@ -88,7 +93,7 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `POST` | `/api/ai/:id/tips/stream` | Stream three interview preparation tips as newline-delimited JSON events |
 | `GET` | `/api/health` | Health check |
 
-The bearer JWT scopes application and AI routes to the signed in user. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to valid PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.
+The bearer JWT scopes application, analytics, export, and AI routes to the signed in user. Analytics uses MongoDB `$match`, `$group`, and `$project` stages instead of loading application documents into Node.js. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to valid PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.
 
 ## Verification
 

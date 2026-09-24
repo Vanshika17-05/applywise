@@ -49,6 +49,8 @@ async function addApplication(token, index) {
 before(async () => {
   process.env.JWT_SECRET = "application-isolation-test-secret-at-least-32-characters";
   process.env.AI_DEMO_MODE = "true";
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.REDIS_URL;
   mongo = await MongoMemoryServer.create({ instance: { dbName: "applywise-isolation" } });
   process.env.MONGODB_URI = mongo.getUri("applywise-isolation");
   const legacyOwner = new mongoose.Types.ObjectId();
@@ -101,12 +103,43 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(listB.response.status, 200);
   assert.deepEqual(listB.data.applications, [], "User B must not receive User A's applications");
 
+  const analyticsB = await request("/analytics?range=custom&from=2026-09-24&to=2026-09-24", { token: userB.token });
+  assert.equal(analyticsB.response.status, 200);
+  assert.equal(analyticsB.data.analytics.summary.total, 0, "User B analytics must not include User A's applications");
+  const invalidRange = await request("/analytics?range=custom&from=invalid&to=2026-09-24", { token: userB.token });
+  assert.equal(invalidRange.response.status, 400);
+
   const updateByB = await request(`/applications/${created[0]._id}`, { token: userB.token, method: "PATCH", body: { status: "Interview" } });
   assert.equal(updateByB.response.status, 404);
   const deleteByB = await request(`/applications/${created[0]._id}`, { token: userB.token, method: "DELETE" });
   assert.equal(deleteByB.response.status, 404);
   const aiByB = await request("/ai/generate-email", { token: userB.token, method: "POST", body: { applicationId: created[0]._id } });
   assert.equal(aiByB.response.status, 404);
+
+  const interview = await request(`/applications/${created[0]._id}`, { token: userA.token, method: "PATCH", body: { status: "Interview" } });
+  assert.equal(interview.response.status, 200);
+  const offer = await request(`/applications/${created[1]._id}`, { token: userA.token, method: "PATCH", body: { status: "Offer" } });
+  assert.equal(offer.response.status, 200);
+
+  const analyticsA = await request("/analytics?range=custom&from=2026-09-24&to=2026-09-24", { token: userA.token });
+  assert.equal(analyticsA.response.status, 200);
+  assert.deepEqual(analyticsA.data.analytics.summary, {
+    total: 3,
+    responses: 2,
+    interviews: 2,
+    offers: 1,
+    rejected: 0,
+    responseRate: 67,
+    interviewRate: 67,
+    offerRate: 33
+  });
+  assert.equal(analyticsA.data.analytics.heatmap[0].applications, 3);
+  assert.deepEqual(Object.fromEntries(analyticsA.data.analytics.statusBreakdown.map(({ name, value }) => [name, value])), { Applied: 1, Interview: 1, Offer: 1, Rejected: 0 });
+
+  const insightsA = await request("/analytics/insights?range=custom&from=2026-09-24&to=2026-09-24", { token: userA.token, method: "POST" });
+  assert.equal(insightsA.response.status, 200);
+  assert.equal(insightsA.data.source, "preview");
+  assert.equal(insightsA.data.insights.length, 3);
 
   const listA = await request("/applications", { token: userA.token });
   assert.equal(listA.response.status, 200);
