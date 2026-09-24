@@ -6,7 +6,8 @@ export function authenticate(req, res, next) {
   if (!token) return res.status(401).json({ error: "Authentication required" });
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
-    req.userId = payload.sub;
+    if (typeof payload.sub !== "string" || !payload.sub) throw new Error("Invalid token subject");
+    req.user = Object.freeze({ id: payload.sub });
     next();
   } catch {
     return res.status(401).json({ error: "Session expired. Please sign in again." });

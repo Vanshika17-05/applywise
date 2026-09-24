@@ -13,7 +13,7 @@ router.get("/:id/resume/view", async (req, res, next) => {
   catch { return res.status(401).json({ error: "Resume link is invalid or expired" }); }
   if (payload.purpose !== "resume" || payload.applicationId !== req.params.id) return res.status(403).json({ error: "Resume link is invalid" });
   try {
-    const application = await Application.findOne({ _id: req.params.id, user: payload.sub }).select("+resumeKey");
+    const application = await Application.findOne({ _id: req.params.id, userId: payload.sub }).select("+resumeKey");
     if (!application || !isLocalResume(application.resumeKey)) return res.status(404).json({ error: "Resume not found" });
     const pdf = await readLocalResume(application.resumeKey);
     res.set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer", "Content-Disposition": 'inline; filename="resume.pdf"' });
@@ -44,15 +44,15 @@ function validPdf(file) {
 
 router.get("/", async (req, res, next) => {
   try {
-    const applications = await Application.find({ user: req.userId }).sort({ dateApplied: -1, createdAt: -1 }).lean();
+    const applications = await Application.find({ userId: req.user.id }).sort({ dateApplied: -1, createdAt: -1 }).lean();
     res.json({ applications });
   } catch (error) { next(error); }
 });
 
 router.delete("/", async (req, res, next) => {
   try {
-    const applications = await Application.find({ user: req.userId }).select("+resumeKey");
-    const { deletedCount } = await Application.deleteMany({ user: req.userId });
+    const applications = await Application.find({ userId: req.user.id }).select("+resumeKey");
+    const { deletedCount } = await Application.deleteMany({ userId: req.user.id });
     await Promise.all(applications.map(async (application) => {
       if (!application.resumeKey) return;
       try { await deleteResume(application.resumeKey); }
@@ -67,15 +67,15 @@ router.post("/", upload.single("resume"), async (req, res, next) => {
     const data = parse(req.body, res);
     if (!data) return;
     if (req.file && !validPdf(req.file)) return res.status(400).json({ error: "Upload a valid PDF file" });
-    const resumeKey = req.file ? await uploadResume(req.userId, req.file) : undefined;
-    const application = await Application.create({ ...data, user: req.userId, resumeKey, resumeName: req.file?.originalname || "" });
+    const resumeKey = req.file ? await uploadResume(req.user.id, req.file) : undefined;
+    const application = await Application.create({ ...data, userId: req.user.id, resumeKey, resumeName: req.file?.originalname || "" });
     res.status(201).json({ application });
   } catch (error) { next(error); }
 });
 
 router.patch("/:id", async (req, res, next) => {
   try {
-    const application = await Application.findOne({ _id: req.params.id, user: req.userId }).select("+resumeKey");
+    const application = await Application.findOne({ _id: req.params.id, userId: req.user.id }).select("+resumeKey");
     if (!application) return res.status(404).json({ error: "Application not found" });
     const allowed = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => ["company", "role", "jobUrl", "dateApplied", "status", "priority", "notes"].includes(key)));
     const data = parse({ ...application.toObject(), ...allowed }, res);
@@ -84,7 +84,7 @@ router.patch("/:id", async (req, res, next) => {
     Object.assign(application, data);
     await application.save();
     if (previousStatus !== application.status) {
-      req.app.get("io")?.to(`user:${req.userId}`).emit("application:status", {
+      req.app.get("io")?.to(`user:${req.user.id}`).emit("application:status", {
         applicationId: application.id, company: application.company, role: application.role, status: application.status
       });
     }
@@ -94,17 +94,17 @@ router.patch("/:id", async (req, res, next) => {
 
 router.get("/:id/resume", async (req, res, next) => {
   try {
-    const application = await Application.findOne({ _id: req.params.id, user: req.userId }).select("+resumeKey");
+    const application = await Application.findOne({ _id: req.params.id, userId: req.user.id }).select("+resumeKey");
     if (!application?.resumeKey) return res.status(404).json({ error: "Resume not found" });
     res.json({ url: await getResumeUrl(application.resumeKey, {
-      userId: req.userId, applicationId: application.id, origin: `${req.protocol}://${req.get("host")}`
+      userId: req.user.id, applicationId: application.id, origin: `${req.protocol}://${req.get("host")}`
     }) });
   } catch (error) { next(error); }
 });
 
 router.delete("/:id", async (req, res, next) => {
   try {
-    const application = await Application.findOneAndDelete({ _id: req.params.id, user: req.userId }).select("+resumeKey");
+    const application = await Application.findOneAndDelete({ _id: req.params.id, userId: req.user.id }).select("+resumeKey");
     if (!application) return res.status(404).json({ error: "Application not found" });
     try { await deleteResume(application.resumeKey); } catch (error) { console.error("Could not remove resume", error); }
     res.status(204).end();

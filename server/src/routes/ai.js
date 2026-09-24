@@ -84,7 +84,7 @@ function generationRequest(application, kind) {
 
 async function applicationForUser(id, userId) {
   if (!mongoose.isValidObjectId(id)) return null;
-  return Application.findOne({ _id: id, user: userId });
+  return Application.findOne({ _id: id, userId });
 }
 
 async function generate(application, kind) {
@@ -177,7 +177,7 @@ async function streamGeneration(req, res, application, kind) {
 
 router.post("/generate-email", async (req, res, next) => {
   try {
-    const application = await applicationForUser(req.body?.applicationId, req.userId);
+    const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
     const output = await generate(application, "follow-up");
     return res.json({ email: output.result, ...output });
@@ -186,7 +186,7 @@ router.post("/generate-email", async (req, res, next) => {
 
 router.post("/generate-email/stream", async (req, res, next) => {
   try {
-    const application = await applicationForUser(req.body?.applicationId, req.userId);
+    const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
     return streamGeneration(req, res, application, "follow-up");
   } catch (error) { return next(error); }
@@ -196,7 +196,7 @@ router.post("/:id/:kind/stream", async (req, res, next) => {
   try {
     const kind = req.params.kind;
     if (!['follow-up', 'tips'].includes(kind)) return res.status(404).json({ error: "Feature not found" });
-    const application = await applicationForUser(req.params.id, req.userId);
+    const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
     return streamGeneration(req, res, application, kind);
   } catch (error) { return next(error); }
@@ -206,7 +206,7 @@ router.post("/:id/:kind", async (req, res, next) => {
   try {
     const kind = req.params.kind;
     if (!["follow-up", "tips"].includes(kind)) return res.status(404).json({ error: "Feature not found" });
-    const application = await applicationForUser(req.params.id, req.userId);
+    const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
     return res.json(await generate(application, kind));
   } catch (error) { return handleError(error, next, res); }

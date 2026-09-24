@@ -7,7 +7,6 @@ import { z } from "zod";
 import { User } from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
 import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, readLocalProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
-import { createStarterApplications } from "../services/demo-applications.js";
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
@@ -58,8 +57,6 @@ router.post("/register", limiter, async (req, res, next) => {
     const { name, email, password } = parsed.data;
     if (await User.exists({ email })) return res.status(409).json({ error: "An account with that email already exists" });
     const user = await User.create({ name, email, passwordHash: await bcrypt.hash(password, 12) });
-    try { await createStarterApplications(user._id); }
-    catch (error) { console.error("Could not create starter applications", error); }
     res.status(201).json({ token: issueToken(user), user: await publicUser(user, req) });
   } catch (error) { next(error); }
 });
@@ -78,7 +75,7 @@ router.post("/login", limiter, async (req, res, next) => {
 
 router.get("/me", authenticate, async (req, res, next) => {
   try {
-    const user = await User.findById(req.userId).select("+photoKey");
+    const user = await User.findById(req.user.id).select("+photoKey");
     if (!user) return res.status(401).json({ error: "Account not found" });
     res.json({ user: await publicUser(user, req) });
   } catch (error) { next(error); }
@@ -89,12 +86,12 @@ router.patch("/profile", authenticate, photoUpload.single("photo"), async (req, 
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
     if (req.file && !validProfilePhoto(req.file)) return res.status(400).json({ error: "Upload a valid JPG, PNG, or WebP image" });
-    const user = await User.findById(req.userId).select("+photoKey");
+    const user = await User.findById(req.user.id).select("+photoKey");
     if (!user) return res.status(401).json({ error: "Account not found" });
     const previousPhoto = user.photoKey;
     let newPhoto = "";
     try {
-      if (req.file) newPhoto = await uploadProfilePhoto(req.userId, req.file);
+      if (req.file) newPhoto = await uploadProfilePhoto(req.user.id, req.file);
       user.name = parsed.data.name;
       if (newPhoto) user.photoKey = newPhoto;
       await user.save();
@@ -111,7 +108,7 @@ router.patch("/settings", authenticate, async (req, res, next) => {
   try {
     const parsed = settingsSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-    const user = await User.findByIdAndUpdate(req.userId, { emailNotifications: parsed.data.emailNotifications }, { new: true }).select("+photoKey");
+    const user = await User.findByIdAndUpdate(req.user.id, { emailNotifications: parsed.data.emailNotifications }, { new: true }).select("+photoKey");
     if (!user) return res.status(401).json({ error: "Account not found" });
     res.json({ user: await publicUser(user, req) });
   } catch (error) { next(error); }

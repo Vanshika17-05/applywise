@@ -4,7 +4,7 @@ export const STATUSES = ["Applied", "Interview", "Offer", "Rejected"];
 export const PRIORITIES = ["Low", "Medium", "High"];
 
 const applicationSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true, select: false },
   company: { type: String, required: true, trim: true, maxlength: 120 },
   role: { type: String, required: true, trim: true, maxlength: 120 },
   jobUrl: { type: String, trim: true, maxlength: 2048, default: "" },
@@ -16,8 +16,8 @@ const applicationSchema = new mongoose.Schema({
   resumeName: { type: String, default: "" }
 }, { timestamps: true });
 
-applicationSchema.index({ user: 1, dateApplied: -1 });
+applicationSchema.index({ userId: 1, dateApplied: -1 });
 applicationSchema.set("toJSON", {
-  transform: (_doc, value) => { delete value.resumeKey; return value; }
+  transform: (_doc, value) => { delete value.resumeKey; delete value.userId; return value; }
 });
 export const Application = mongoose.model("Application", applicationSchema);
