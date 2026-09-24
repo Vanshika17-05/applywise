@@ -72,15 +72,47 @@ export default function Board({ applications, loading, token, userName = "", onC
   const [ai, setAI] = useState(null);
   const [dragging, setDragging] = useState(false);
   const aiRequest = useRef(null);
+  const aiTextQueue = useRef([]);
+  const aiTypingTimer = useRef(null);
+  const aiStreamDone = useRef(false);
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const filtered = useMemo(() => applications.filter((application) => `${application.company} ${application.role}`.toLowerCase().includes(search.toLowerCase())), [applications, search]);
   const responseRate = applications.length ? Math.round(applications.filter((application) => application.status !== "Applied").length / applications.length * 100) : 0;
 
-  useEffect(() => () => aiRequest.current?.abort(), []);
+  useEffect(() => () => {
+    aiRequest.current?.abort();
+    if (aiTypingTimer.current) clearTimeout(aiTypingTimer.current);
+  }, []);
+
+  function finishTyping(requestId) {
+    aiStreamDone.current = true;
+    if (!aiTypingTimer.current && aiTextQueue.current.length === 0) {
+      setAI((current) => current?.requestId === requestId ? { ...current, loading: false } : current);
+    }
+  }
+
+  function typeQueuedWords(requestId) {
+    if (aiTypingTimer.current) return;
+    const tick = () => {
+      const word = aiTextQueue.current.shift();
+      if (!word) {
+        aiTypingTimer.current = null;
+        if (aiStreamDone.current) setAI((current) => current?.requestId === requestId ? { ...current, loading: false } : current);
+        return;
+      }
+      setAI((current) => current?.requestId === requestId ? { ...current, result: `${current.result || ""}${word}` } : current);
+      aiTypingTimer.current = setTimeout(tick, 24);
+    };
+    tick();
+  }
 
   async function runAI(application, kind) {
     if (ai?.loading) return;
     aiRequest.current?.abort();
+    if (aiTypingTimer.current) clearTimeout(aiTypingTimer.current);
+    aiTypingTimer.current = null;
+    aiTextQueue.current = [];
+    aiStreamDone.current = false;
     const controller = new AbortController();
     const requestId = `${application._id}-${kind}-${Date.now()}`;
     aiRequest.current = controller;
@@ -92,17 +124,27 @@ export default function Board({ applications, loading, token, userName = "", onC
         token,
         body,
         signal: controller.signal,
-        onEvent: (event) => setAI((current) => {
-          if (!current || current.requestId !== requestId) return current;
-          if (event.type === "status") return { ...current, status: event.message || current.status };
-          if (event.type === "source") return { ...current, source: event.source, providerStatus: event.providerStatus };
-          if (event.type === "chunk") return { ...current, result: `${current.result || ""}${event.text || ""}` };
-          if (event.type === "done") return { ...current, loading: false, source: event.source || current.source };
-          return current;
-        })
+        onEvent: (event) => {
+          if (event.type === "chunk") {
+            aiTextQueue.current.push(...((event.text || "").match(/\S+\s*/g) || []));
+            typeQueuedWords(requestId);
+            return;
+          }
+          if (event.type === "done") finishTyping(requestId);
+          setAI((current) => {
+            if (!current || current.requestId !== requestId) return current;
+            if (event.type === "status") return { ...current, status: event.message || current.status };
+            if (event.type === "source") return { ...current, source: event.source, providerStatus: event.providerStatus };
+            if (event.type === "done") return { ...current, source: event.source || current.source };
+            return current;
+          });
+        }
       });
-      setAI((current) => current?.requestId === requestId ? { ...current, loading: false } : current);
+      finishTyping(requestId);
     } catch (error) {
+      aiTextQueue.current = [];
+      if (aiTypingTimer.current) clearTimeout(aiTypingTimer.current);
+      aiTypingTimer.current = null;
       if (error?.name !== "AbortError") setAI((current) => current?.requestId === requestId ? { ...current, loading: false, error: error.message } : current);
     } finally {
       if (aiRequest.current === controller) aiRequest.current = null;
