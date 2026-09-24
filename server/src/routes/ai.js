@@ -67,8 +67,8 @@ function generationRequest(application, kind) {
     status: application.status
   }, null, 2);
   const task = kind === "follow-up"
-    ? "Write a concise, professional job application follow-up email. Return a clear subject line and email body. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts."
-    : "Give exactly 3 numbered, practical interview preparation tips tailored to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
+    ? "Write a concise, professional job application follow-up email. Return a clear subject line and email body in plain text without Markdown symbols. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts."
+    : "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
 
   return {
     contents: [{
