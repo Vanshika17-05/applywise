@@ -43,6 +43,8 @@ export default function Workspace() {
       if (recentMove.current?.applicationId === update.applicationId && Date.now() - recentMove.current.at < 5000) return;
       toast(`${update.company} moved to ${update.status}`, { icon: <Bell size={16} color="var(--accent)" /> });
     });
+    socket.on("ai:completed", (update) => toast.success(update.kind === "tips" ? "Your interview tips are ready" : "Your follow-up email is ready", { id: `ai-${update.jobId}` }));
+    socket.on("ai:failed", (update) => toast.error("AI generation failed. Please try again.", { id: `ai-${update.jobId}` }));
     return () => socket.disconnect();
   }, [token]);
 

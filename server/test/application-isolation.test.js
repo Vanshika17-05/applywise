@@ -5,6 +5,8 @@ import { MongoMemoryServer } from "mongodb-memory-server-core";
 import { createApp } from "../src/app.js";
 import { connectDatabase } from "../src/config/db.js";
 import { Application } from "../src/models/Application.js";
+import { createResumeStorage, deleteResume, finalizeResumeUpload } from "../src/services/s3.js";
+import { generateQueuedAi } from "../src/services/queued-ai.js";
 
 let mongo;
 let server;
@@ -49,6 +51,7 @@ async function addApplication(token, index) {
 before(async () => {
   process.env.JWT_SECRET = "application-isolation-test-secret-at-least-32-characters";
   process.env.AI_DEMO_MODE = "true";
+  process.env.RESUME_STORAGE = "local";
   delete process.env.GEMINI_API_KEY;
   delete process.env.REDIS_URL;
   mongo = await MongoMemoryServer.create({ instance: { dbName: "applywise-isolation" } });
@@ -91,6 +94,20 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(initialA.response.status, 200);
   assert.deepEqual(initialA.data.applications, []);
 
+  const localResume = await finalizeResumeUpload(userA.user.id, {
+    mimetype: "application/pdf",
+    buffer: Buffer.from("%PDF-1.7\nApplywise test PDF")
+  });
+  assert.match(localResume.resumeKey, /^local\//);
+  await deleteResume(localResume.resumeKey);
+  await assert.rejects(() => finalizeResumeUpload(userA.user.id, {
+    mimetype: "application/pdf",
+    buffer: Buffer.from("not a pdf")
+  }), (error) => error.status === 400);
+  process.env.RESUME_STORAGE = "s3";
+  assert.ok(createResumeStorage(), "Production resume storage must use multer-s3");
+  process.env.RESUME_STORAGE = "local";
+
   const created = [];
   for (let index = 1; index <= 3; index += 1) created.push(await addApplication(userA.token, index));
 
@@ -115,6 +132,18 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(deleteByB.response.status, 404);
   const aiByB = await request("/ai/generate-email", { token: userB.token, method: "POST", body: { applicationId: created[0]._id } });
   assert.equal(aiByB.response.status, 404);
+  const queueByB = await request("/ai/jobs", { token: userB.token, method: "POST", body: { applicationId: created[0]._id, kind: "follow-up" } });
+  assert.equal(queueByB.response.status, 404, "User B must not enqueue AI work for User A's application");
+  const queueUnavailable = await request("/ai/jobs", { token: userA.token, method: "POST", body: { applicationId: created[0]._id, kind: "follow-up" } });
+  assert.equal(queueUnavailable.response.status, 503, "The API must fail over cleanly when Redis is not configured");
+  const workerPreview = await generateQueuedAi({
+    company: "User A Company 1",
+    role: "Role 1",
+    dateApplied: new Date("2026-09-24"),
+    status: "Applied"
+  }, "follow-up");
+  assert.equal(workerPreview.source, "preview");
+  assert.match(workerPreview.result, /User A Company 1/);
 
   const interview = await request(`/applications/${created[0]._id}`, { token: userA.token, method: "PATCH", body: { status: "Interview" } });
   assert.equal(interview.response.status, 200);

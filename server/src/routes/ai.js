@@ -5,10 +5,12 @@ import mongoose from "mongoose";
 import { authenticate } from "../middleware/auth.js";
 import { Application } from "../models/Application.js";
 import { generateAiPreview } from "../services/ai-preview.js";
+import { enqueueAiJob, ownedAiJob } from "../services/ai-queue.js";
 
 const router = Router();
 router.use(authenticate);
-router.use(rateLimit({ windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false }));
+const generationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false, skipFailedRequests: true });
+const statusLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false });
 
 class GeminiProviderError extends Error {
   constructor(status) {
@@ -175,7 +177,44 @@ async function streamGeneration(req, res, application, kind) {
   }
 }
 
-router.post("/generate-email", async (req, res, next) => {
+router.post("/jobs", generationLimiter, async (req, res, next) => {
+  try {
+    const kind = req.body?.kind;
+    if (!["follow-up", "tips"].includes(kind)) return res.status(400).json({ error: "Choose follow-up or tips" });
+    const application = await applicationForUser(req.body?.applicationId, req.user.id);
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    const jobId = await enqueueAiJob(req.user.id, application, kind);
+    return res.status(202).json({ jobId, status: "queued" });
+  } catch (error) {
+    if (!error.status) {
+      console.warn("Could not enqueue AI job", { type: error?.name || "Error" });
+      error.status = 503;
+      error.message = "Background AI processing is temporarily unavailable";
+    }
+    return next(error);
+  }
+});
+
+router.get("/jobs/:jobId", statusLimiter, async (req, res, next) => {
+  try {
+    const job = await ownedAiJob(req.params.jobId, req.user.id);
+    if (!job) return res.status(404).json({ error: "AI job not found" });
+    const status = await job.getState();
+    const response = { jobId: job.id, status, progress: job.progress || 0 };
+    if (status === "completed") response.result = job.returnvalue;
+    if (status === "failed") response.error = "AI generation failed. Please try again.";
+    return res.json(response);
+  } catch (error) {
+    if (!error.status) {
+      console.warn("Could not read AI job", { type: error?.name || "Error" });
+      error.status = 503;
+      error.message = "Background AI processing is temporarily unavailable";
+    }
+    return next(error);
+  }
+});
+
+router.post("/generate-email", generationLimiter, async (req, res, next) => {
   try {
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
@@ -184,7 +223,7 @@ router.post("/generate-email", async (req, res, next) => {
   } catch (error) { return handleError(error, next, res); }
 });
 
-router.post("/generate-email/stream", async (req, res, next) => {
+router.post("/generate-email/stream", generationLimiter, async (req, res, next) => {
   try {
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
@@ -192,7 +231,7 @@ router.post("/generate-email/stream", async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.post("/:id/:kind/stream", async (req, res, next) => {
+router.post("/:id/:kind/stream", generationLimiter, async (req, res, next) => {
   try {
     const kind = req.params.kind;
     if (!['follow-up', 'tips'].includes(kind)) return res.status(404).json({ error: "Feature not found" });
@@ -202,7 +241,7 @@ router.post("/:id/:kind/stream", async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.post("/:id/:kind", async (req, res, next) => {
+router.post("/:id/:kind", generationLimiter, async (req, res, next) => {
   try {
     const kind = req.params.kind;
     if (!["follow-up", "tips"].includes(kind)) return res.status(404).json({ error: "Feature not found" });

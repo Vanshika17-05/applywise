@@ -4,7 +4,7 @@ import multer from "multer";
 import { z } from "zod";
 import { Application, STATUSES, PRIORITIES } from "../models/Application.js";
 import { authenticate } from "../middleware/auth.js";
-import { uploadResume, getResumeUrl, readLocalResume, isLocalResume, deleteResume } from "../services/s3.js";
+import { createResumeStorage, deleteResume, discardResumeUpload, finalizeResumeUpload, getResumeUrl, isLocalResume, readLocalResume } from "../services/s3.js";
 import { invalidateAnalyticsCache } from "../services/analytics-cache.js";
 
 const router = Router();
@@ -22,7 +22,16 @@ router.get("/:id/resume/view", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 router.use(authenticate);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const upload = multer({
+  storage: createResumeStorage() || multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (file.mimetype === "application/pdf" && file.originalname.toLowerCase().endsWith(".pdf")) return callback(null, true);
+    const error = new Error("Upload a valid PDF file");
+    error.status = 400;
+    return callback(error);
+  }
+});
 const schema = z.object({
   company: z.string().trim().min(1).max(120),
   role: z.string().trim().min(1).max(120),
@@ -37,10 +46,6 @@ function parse(body, res) {
   const result = schema.safeParse(body);
   if (!result.success) res.status(400).json({ error: result.error.issues[0].message });
   return result.success ? result.data : null;
-}
-
-function validPdf(file) {
-  return file?.mimetype === "application/pdf" && file.buffer.subarray(0, 5).toString() === "%PDF-";
 }
 
 router.get("/", async (req, res, next) => {
@@ -65,15 +70,31 @@ router.delete("/", async (req, res, next) => {
 });
 
 router.post("/", upload.single("resume"), async (req, res, next) => {
+  let resumeKey;
   try {
     const data = parse(req.body, res);
-    if (!data) return;
-    if (req.file && !validPdf(req.file)) return res.status(400).json({ error: "Upload a valid PDF file" });
-    const resumeKey = req.file ? await uploadResume(req.user.id, req.file) : undefined;
-    const application = await Application.create({ ...data, userId: req.user.id, resumeKey, resumeName: req.file?.originalname || "" });
+    if (!data) {
+      await discardResumeUpload(req.file);
+      return;
+    }
+    const uploadResult = await finalizeResumeUpload(req.user.id, req.file);
+    resumeKey = uploadResult.resumeKey;
+    const application = await Application.create({
+      ...data,
+      userId: req.user.id,
+      resumeKey,
+      resumeUrl: uploadResult.resumeUrl,
+      resumeName: req.file?.originalname || ""
+    });
     await invalidateAnalyticsCache(req.user.id);
     res.status(201).json({ application });
-  } catch (error) { next(error); }
+  } catch (error) {
+    try {
+      if (resumeKey) await deleteResume(resumeKey);
+      else await discardResumeUpload(req.file);
+    } catch (cleanupError) { console.error("Could not clean up failed resume upload", cleanupError); }
+    next(error);
+  }
 });
 
 router.patch("/:id", async (req, res, next) => {

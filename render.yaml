@@ -28,3 +28,24 @@ services:
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
+  - type: worker
+    name: applywise-ai-worker
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    dockerCommand: node src/workers/ai-worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: AI_DEMO_MODE
+        value: "false"
+      - key: AI_WORKER_CONCURRENCY
+        value: "4"
+      - key: AI_WORKER_RATE_LIMIT
+        value: "20"

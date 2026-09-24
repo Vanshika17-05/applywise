@@ -13,11 +13,12 @@ const applicationSchema = new mongoose.Schema({
   priority: { type: String, enum: PRIORITIES, default: "Medium" },
   notes: { type: String, maxlength: 5000, default: "" },
   resumeKey: { type: String, select: false },
+  resumeUrl: { type: String, select: false },
   resumeName: { type: String, default: "" }
 }, { timestamps: true });
 
 applicationSchema.index({ userId: 1, dateApplied: -1 });
 applicationSchema.set("toJSON", {
-  transform: (_doc, value) => { delete value.resumeKey; delete value.userId; return value; }
+  transform: (_doc, value) => { delete value.resumeKey; delete value.resumeUrl; delete value.userId; return value; }
 });
 export const Application = mongoose.model("Application", applicationSchema);

@@ -26,6 +26,16 @@ function priorityStyle(priority) {
   return `priority-${priority.toLowerCase()}`;
 }
 
+function waitFor(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, milliseconds);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
 function LoadingDots() {
   return <span className="inline-flex items-center gap-1" aria-hidden="true">{[0, 1, 2].map((index) => <motion.span key={index} className="size-1 rounded-full bg-current" animate={{ opacity: [.25, 1, .25], y: [0, -2, 0] }} transition={{ duration: .9, repeat: Infinity, delay: index * .16 }} />)}</span>;
 }
@@ -106,6 +116,32 @@ export default function Board({ applications, loading, token, userName = "", onC
     tick();
   }
 
+  function revealQueuedResult(requestId, output) {
+    setAI((current) => current?.requestId === requestId ? { ...current, source: output.source, status: "Response ready" } : current);
+    aiTextQueue.current.push(...((output.result || "").match(/\S+\s*/g) || []));
+    typeQueuedWords(requestId);
+    finishTyping(requestId);
+  }
+
+  async function runQueuedJob(application, kind, requestId, controller) {
+    const queued = await api("/ai/jobs", { token, method: "POST", signal: controller.signal, body: { applicationId: application._id, kind } });
+    setAI((current) => current?.requestId === requestId ? { ...current, jobId: queued.jobId, status: "Queued for background processing" } : current);
+    const deadline = Date.now() + 3 * 60_000;
+    while (!controller.signal.aborted) {
+      if (Date.now() > deadline) throw new Error("AI generation is taking too long. Please try again.");
+      const job = await api(`/ai/jobs/${queued.jobId}`, { token, signal: controller.signal });
+      if (job.status === "completed") {
+        revealQueuedResult(requestId, job.result);
+        toast.success(kind === "follow-up" ? "Follow-up email is ready" : "Interview tips are ready", { id: `ai-${queued.jobId}` });
+        return;
+      }
+      if (job.status === "failed") throw new Error(job.error || "AI generation failed");
+      const status = job.status === "active" ? "AI worker is generating your response" : job.status === "delayed" ? "Retry scheduled" : "Waiting for an AI worker";
+      setAI((current) => current?.requestId === requestId ? { ...current, status } : current);
+      await waitFor(800, controller.signal);
+    }
+  }
+
   async function runAI(application, kind) {
     if (ai?.loading) return;
     aiRequest.current?.abort();
@@ -118,6 +154,14 @@ export default function Board({ applications, loading, token, userName = "", onC
     aiRequest.current = controller;
     setAI({ application, kind, requestId, loading: true, result: "", status: kind === "follow-up" ? "Generating your email" : "Preparing interview tips" });
     try {
+      try {
+        await runQueuedJob(application, kind, requestId, controller);
+        return;
+      } catch (queueError) {
+        if (queueError?.name === "AbortError") throw queueError;
+        if (queueError?.status !== 503) throw queueError;
+        setAI((current) => current?.requestId === requestId ? { ...current, status: "Starting live generation" } : current);
+      }
       const endpoint = kind === "follow-up" ? "/ai/generate-email/stream" : `/ai/${application._id}/tips/stream`;
       const body = kind === "follow-up" ? { applicationId: application._id } : undefined;
       await streamApi(endpoint, {

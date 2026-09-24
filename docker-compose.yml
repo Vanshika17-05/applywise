@@ -52,6 +52,24 @@ services:
       redis:
         condition: service_healthy
 
+  worker:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    command: node src/workers/ai-worker.js
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      AI_DEMO_MODE: ${AI_DEMO_MODE:-true}
+      AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-4}
+      AI_WORKER_RATE_LIMIT: ${AI_WORKER_RATE_LIMIT:-20}
+    depends_on:
+      redis:
+        condition: service_healthy
+
   client:
     build:
       context: .

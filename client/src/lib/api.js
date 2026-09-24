@@ -7,12 +7,17 @@ export async function api(path, { token, body, ...options } = {}) {
   let response;
   try {
     response = await fetch(`${API_URL}/api${path}`, { ...options, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
     throw new Error("Cannot reach the server. Check your connection and try again.");
   }
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Request failed");
+  if (!response.ok) {
+    const error = new Error(data.error || "Request failed");
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 

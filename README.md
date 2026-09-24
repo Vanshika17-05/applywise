@@ -9,8 +9,8 @@ The interface uses teal glass panels and supports day and night modes. The sign-
 ## Stack
 
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
-- API: Node.js, Express 5, MongoDB aggregation pipelines with Mongoose, Redis, JWT, bcrypt, LangChain with Google Gemini, AWS S3, Socket.io
-- Local containers: Docker Compose with MongoDB, Redis, API, and Vite client
+- API: Node.js, Express 5, MongoDB aggregation pipelines with Mongoose, Redis, BullMQ, JWT, bcrypt, LangChain with Google Gemini, AWS S3 via `multer-s3`, Socket.io
+- Local containers: Docker Compose with MongoDB, Redis, API, BullMQ AI worker, and Vite client
 - Production: Vercel for the Vite client and Express API, MongoDB Atlas for persistent data
 - Alternative API host: Render configuration is included in `render.yaml`
 
@@ -36,7 +36,7 @@ For Docker, set a Gemini API key in an untracked `.env` in this folder if you wa
 docker compose up --build
 ```
 
-The Compose file supplies local MongoDB and Redis services plus a development JWT secret. Redis caches each user's analytics response for five minutes and application mutations invalidate that user's cache version. Compose stores resume PDFs in a persistent Docker volume and enables labeled AI previews by default. To use AWS S3 in Docker, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `GEMINI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development. Docker is not needed to run the apps directly.
+The Compose file supplies local MongoDB and Redis services plus a development JWT secret. Redis caches each user's analytics response for five minutes and backs the BullMQ AI queue. Application mutations invalidate that user's cache version. Compose runs a separate AI worker with bounded concurrency and retry backoff. It stores resume PDFs in a persistent Docker volume for development and enables labeled AI previews by default. To stream uploads directly to private S3 objects, set `RESUME_STORAGE=s3` and the AWS variables in `.env`. To use live AI, set `GEMINI_API_KEY` in `.env`; a configured key always takes precedence over previews. Set your own `JWT_SECRET` for anything beyond local development.
 
 ## Environment variables
 
@@ -44,6 +44,8 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string |
 | `REDIS_URL` | Optional Redis connection URL for the five-minute analytics cache; Docker Compose configures this automatically |
+| `AI_WORKER_CONCURRENCY` | Parallel BullMQ AI jobs per worker; defaults to `4` |
+| `AI_WORKER_RATE_LIMIT` | Maximum AI jobs started per worker per minute; defaults to `20` |
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails and interview tips |
@@ -55,7 +57,7 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. The local preview does not make a Gemini request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. Resume links expire after five minutes; profile photo links expire after one hour. Production uploads require a private S3 bucket; S3 objects are encrypted at rest and opened through signed links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. The local preview does not make a Gemini request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, `multer-s3` streams resume PDFs to private S3 objects with AES-256 server-side encryption. Applywise stores the private object key and URL as hidden application metadata and returns only five-minute signed read links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ## Deployment
 
@@ -69,6 +71,8 @@ The current production deployment uses the root `vercel.json`. It builds `client
 6. Redeploy after changing environment variables.
 
 The application saves accounts, profile preferences, and applications in MongoDB Atlas. Status changes always update through the REST API and show a toast. For cross-client Socket.io events in production, set `VITE_SOCKET_URL` to a persistent Socket.io service; local Docker and Node development use the included Socket.io server directly.
+
+BullMQ requires a long-running worker process. The included `render.yaml` defines both the persistent API service and `applywise-ai-worker`; give both services the same `REDIS_URL` and `GEMINI_API_KEY`, then point `VITE_API_URL` and `VITE_SOCKET_URL` at the API service. A Vercel serverless function cannot host the worker itself. When no queue is available, the client receives a `503` from the producer and automatically falls back to the existing streamed Gemini endpoint, so AI actions remain usable.
 
 ## API
 
@@ -86,6 +90,8 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `GET` | `/api/analytics` | Aggregated metrics, funnel, timeline, and heatmap with date-range filters |
 | `GET` | `/api/analytics/export` | Export the selected date range as CSV |
 | `POST` | `/api/analytics/insights` | Generate three LangChain and Gemini career insights from aggregated metrics |
+| `POST` | `/api/ai/jobs` | Enqueue an owned follow-up or tips job in BullMQ |
+| `GET` | `/api/ai/jobs/:jobId` | Poll an owned background job and retrieve its result |
 | `POST` | `/api/ai/:id/follow-up` | Generate follow-up email |
 | `POST` | `/api/ai/generate-email` | Generate a follow-up email from `{ applicationId }` |
 | `POST` | `/api/ai/generate-email/stream` | Stream a follow-up email as newline-delimited JSON events |
@@ -93,7 +99,7 @@ The application saves accounts, profile preferences, and applications in MongoDB
 | `POST` | `/api/ai/:id/tips/stream` | Stream three interview preparation tips as newline-delimited JSON events |
 | `GET` | `/api/health` | Health check |
 
-The bearer JWT scopes application, analytics, export, and AI routes to the signed in user. Analytics uses MongoDB `$match`, `$group`, and `$project` stages instead of loading application documents into Node.js. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to valid PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.
+The bearer JWT scopes application, analytics, export, AI generation, and BullMQ job lookups to the signed in user. Analytics uses MongoDB `$match`, `$group`, and `$project` stages instead of loading application documents into Node.js. AI jobs use retry backoff and retained results; the API emits completion events to the user's Socket.io room while polling remains available when persistent sockets are unavailable. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to verified PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.
 
 ## Verification
 

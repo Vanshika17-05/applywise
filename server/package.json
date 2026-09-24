@@ -7,15 +7,17 @@
     "dev": "node --watch src/index.js",
     "dev:local": "node --watch src/dev-local.js",
     "start": "node src/index.js",
+    "worker": "node src/workers/ai-worker.js",
     "test": "node --test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.800.0",
-    "@aws-sdk/s3-request-presigner": "^3.800.0",
+    "@aws-sdk/client-s3": "^3.1139.0",
+    "@aws-sdk/s3-request-presigner": "^3.1139.0",
     "@google/generative-ai": "^0.24.1",
     "@langchain/core": "^1.2.12",
     "@langchain/google-genai": "^2.3.2",
     "bcryptjs": "^3.0.2",
+    "bullmq": "^6.3.8",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -24,6 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.15.0",
     "multer": "^2.0.0",
+    "multer-s3": "^3.0.1",
     "redis": "^6.2.1",
     "socket.io": "^4.8.1",
     "zod": "^3.25.0"
