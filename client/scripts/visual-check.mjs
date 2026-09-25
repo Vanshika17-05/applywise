@@ -97,6 +97,24 @@ try {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
 
+    await page.getByRole("link", { name: "AI Tools" }).click();
+    await page.getByRole("heading", { name: "AI Career Studio" }).waitFor();
+    await page.getByRole("heading", { name: "One-click Cover Letter" }).waitFor();
+    await page.getByRole("heading", { name: "Resume-to-JD Match" }).waitFor();
+    await page.waitForTimeout(700);
+    await page.getByRole("button", { name: "Generate cover letter" }).click();
+    await page.getByRole("button", { name: "Copy letter" }).waitFor({ timeout: 60000 });
+    const resumePage = await browser.newPage();
+    await resumePage.setContent("<h1>Vanshika — Software Engineer</h1><p>React, Node.js, MongoDB, REST APIs, scalable backend systems, and automated testing.</p>");
+    const resumePdf = await resumePage.pdf({ format: "A4" });
+    await resumePage.close();
+    await page.locator("#ai-resume").setInputFiles({ name: "applywise-resume.pdf", mimeType: "application/pdf", buffer: resumePdf });
+    await page.locator("#ai-job-description").fill("Seeking a React and Node.js engineer with MongoDB, AWS, automated testing, REST API, and scalable systems experience.");
+    await page.getByRole("button", { name: "Analyze resume match" }).click();
+    await page.getByText("Resume match", { exact: true }).waitFor({ timeout: 60000 });
+    await page.getByRole("button", { name: "Copy analysis" }).waitFor();
+    await page.screenshot({ path: path.join(screenshots, "ai-career-studio.png"), fullPage: true });
+
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await page.waitForTimeout(350);
     await page.screenshot({ path: path.join(screenshots, "board-dark.png"), fullPage: true });

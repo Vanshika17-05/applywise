@@ -4,7 +4,7 @@ A job application tracker with a Kanban pipeline, AI career assistance, analytic
 
 Live app and API: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). Vercel serves the Vite client and the Express REST API from the same origin.
 
-The interface uses teal glass panels and supports day and night modes. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
+The interface uses teal glass panels and supports day and night modes. The dedicated AI Career Studio at `/ai-tools` keeps Cover Letter and Resume Match workflows easy to find outside the Kanban cards. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
 
 ## Stack
 
@@ -100,7 +100,7 @@ BullMQ requires a long-running worker process. The included `render.yaml` define
 | `POST` | `/api/ai/:id/tips/stream` | Stream three interview preparation tips as newline-delimited JSON events |
 | `POST` | `/api/ai/:id/cover-letter` | Generate a company and role specific cover letter |
 | `POST` | `/api/ai/:id/cover-letter/stream` | Stream a cover letter as newline-delimited JSON events |
-| `POST` | `/api/ai/:id/match-score` | Compare the private resume PDF and supplied job description; return score, skill matches, gaps, and recommendations |
+| `POST` | `/api/ai/:id/match-score` | Compare a stored or one-time multipart PDF with the supplied job description; return score, skill matches, gaps, and recommendations |
 | `GET` | `/api/health` | Health check |
 
 The bearer JWT scopes application, analytics, export, AI generation, and BullMQ job lookups to the signed in user. Analytics uses MongoDB `$match`, `$group`, and `$project` stages instead of loading application documents into Node.js. AI jobs use retry backoff and retained results; the API emits completion events to the user's Socket.io room while polling remains available when persistent sockets are unavailable. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to verified PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.

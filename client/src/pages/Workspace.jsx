@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
-import { BarChart3, Bell, CircleDashed, LayoutGrid, Plus } from "lucide-react";
+import { BarChart3, Bell, CircleDashed, LayoutGrid, Plus, Sparkles } from "lucide-react";
 import { api, socketUrl } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { ThemeToggle } from "@/state/theme";
@@ -12,6 +12,7 @@ import AccountMenu from "@/components/AccountMenu";
 
 const Board = lazy(() => import("@/pages/Board"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
+const AITools = lazy(() => import("@/pages/AITools"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const sidebarNavClass = ({ isActive }) => `flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${isActive ? "bg-accent-soft text-accent" : "text-subtle hover:bg-[var(--accent-muted)] hover:text-[var(--text)]"}`;
@@ -91,7 +92,7 @@ export default function Workspace() {
   function openEdit(application) { setEditing(application); setFormOpen(true); }
   function signOut() { logout(); navigate("/auth", { replace: true }); toast.success("Logged out successfully"); }
   const counts = useMemo(() => applications.reduce((result, item) => ({ ...result, [item.status]: (result[item.status] || 0) + 1 }), {}), [applications]);
-  const view = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Overview";
+  const view = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/ai-tools") ? "AI Tools" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Overview";
 
   return <div className="workspace-shell min-h-screen page-bg text-main lg:flex">
     <aside className="sticky left-0 top-0 z-30 hidden h-screen w-[260px] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-theme glass-sidebar px-5 py-7 lg:flex">
@@ -100,6 +101,7 @@ export default function Workspace() {
       <nav className="mt-3 space-y-1">
         <NavLink to="/" end className={sidebarNavClass}><LayoutGrid size={18} /> Dashboard</NavLink>
         <NavLink to="/analytics" className={sidebarNavClass}><BarChart3 size={18} /> Analytics</NavLink>
+        <NavLink to="/ai-tools" className={sidebarNavClass}><Sparkles size={18} /> AI Tools</NavLink>
       </nav>
       <div className="mt-10 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-faint">Pipeline</div>
       <div className="mt-3 space-y-1 px-3">{["Applied", "Interview", "Offer", "Rejected"].map((status) => <div key={status} className="flex items-center justify-between py-1.5 text-sm text-subtle"><span>{status}</span><span className="text-xs tabular-nums text-faint">{counts[status] || 0}</span></div>)}</div>
@@ -110,8 +112,8 @@ export default function Workspace() {
         <div className="flex items-center gap-3"><div className="flex items-center gap-2.5 text-lg font-extrabold lg:hidden"><span className="brand-mark flex size-8 items-center justify-center rounded-lg"><CircleDashed size={18} /></span> applywise<span className="text-accent">.</span></div><span className="hidden text-sm text-faint lg:block">Workspace <span className="mx-2 text-faint">/</span> <span className="text-main">{view}</span></span></div>
         <div className="flex items-center gap-2 sm:gap-3"><span className="accent-pill hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium xl:flex"><span className="size-1.5 rounded-full bg-[var(--accent)]" /> All systems ready</span><ThemeToggle /><Button onClick={openCreate} size="sm" title="New application (N)" aria-keyshortcuts="N"><Plus size={15} /><span className="hidden sm:inline">New application</span><span className="sm:hidden">New</span></Button><div className="lg:hidden"><AccountMenu user={session.user} onLogout={signOut} mobile /></div></div>
       </header>
-      <nav className="flex gap-5 border-b border-theme px-5 lg:hidden"><NavLink to="/" end className={({ isActive }) => `border-b-2 py-3 text-sm ${isActive ? "border-[var(--accent)] text-accent" : "border-transparent text-subtle"}`}>Dashboard</NavLink><NavLink to="/analytics" className={({ isActive }) => `border-b-2 py-3 text-sm ${isActive ? "border-[var(--accent)] text-accent" : "border-transparent text-subtle"}`}>Analytics</NavLink></nav>
-      <main className="mx-auto max-w-[1700px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10"><Suspense fallback={<div className="h-80 animate-pulse rounded-2xl glass-soft" />}><Routes><Route path="/" element={<Board applications={applications} loading={loading} token={token} userName={session.user.name} onCreate={openCreate} onEdit={openEdit} onDelete={remove} onMove={move} />} /><Route path="/analytics" element={<Analytics applications={applications} loading={loading} token={token} onAddApplication={openCreate} />} /><Route path="/profile" element={<Profile />} /><Route path="/settings" element={<Settings applicationCount={applications.length} applicationsLoading={loading} onDeletedAll={() => setApplications([])} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></main>
+      <nav className="flex gap-5 overflow-x-auto border-b border-theme px-5 lg:hidden"><NavLink to="/" end className={({ isActive }) => `shrink-0 border-b-2 py-3 text-sm ${isActive ? "border-[var(--accent)] text-accent" : "border-transparent text-subtle"}`}>Dashboard</NavLink><NavLink to="/analytics" className={({ isActive }) => `shrink-0 border-b-2 py-3 text-sm ${isActive ? "border-[var(--accent)] text-accent" : "border-transparent text-subtle"}`}>Analytics</NavLink><NavLink to="/ai-tools" className={({ isActive }) => `shrink-0 border-b-2 py-3 text-sm ${isActive ? "border-[var(--accent)] text-accent" : "border-transparent text-subtle"}`}>AI Tools</NavLink></nav>
+      <main className="mx-auto max-w-[1700px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10"><Suspense fallback={<div className="h-80 animate-pulse rounded-2xl glass-soft" />}><Routes><Route path="/" element={<Board applications={applications} loading={loading} token={token} userName={session.user.name} onCreate={openCreate} onEdit={openEdit} onDelete={remove} onMove={move} />} /><Route path="/analytics" element={<Analytics applications={applications} loading={loading} token={token} onAddApplication={openCreate} />} /><Route path="/ai-tools" element={<AITools applications={applications} loading={loading} token={token} onAddApplication={openCreate} />} /><Route path="/profile" element={<Profile />} /><Route path="/settings" element={<Settings applicationCount={applications.length} applicationsLoading={loading} onDeletedAll={() => setApplications([])} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></main>
     </div>
     <ApplicationForm open={formOpen} onOpenChange={setFormOpen} application={editing} token={token} onSaved={save} />
   </div>;

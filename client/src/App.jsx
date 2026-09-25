@@ -16,7 +16,7 @@ export default function App() {
   const { session, checking } = useAuth();
   const location = useLocation();
   useEffect(() => {
-    const page = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Dashboard";
+    const page = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/ai-tools") ? "AI Tools" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Dashboard";
     document.title = session ? `Applywise — ${page}` : "Applywise — Sign in";
   }, [session, location.pathname]);
   if (checking) return <AppSkeleton />;

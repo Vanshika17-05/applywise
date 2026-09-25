@@ -2,6 +2,7 @@ import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 import { GoogleGenerativeAI, GoogleGenerativeAIAbortError } from "@google/generative-ai";
 import mongoose from "mongoose";
+import multer from "multer";
 import { authenticate } from "../middleware/auth.js";
 import { Application } from "../models/Application.js";
 import { generateAiPreview } from "../services/ai-preview.js";
@@ -12,6 +13,16 @@ const router = Router();
 router.use(authenticate);
 const generationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false, skipFailedRequests: true });
 const statusLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false });
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (file.mimetype === "application/pdf" && file.originalname.toLowerCase().endsWith(".pdf")) return callback(null, true);
+    const error = new Error("Upload a valid PDF file");
+    error.status = 400;
+    return callback(error);
+  }
+});
 
 class GeminiProviderError extends Error {
   constructor(status) {
@@ -119,7 +130,8 @@ function jobDescription(value) {
 
 async function generationExtra(application, kind, input = {}) {
   const extra = { jobDescription: jobDescription(input.jobDescription) };
-  if (kind === "match-score" && application.resumeKey) extra.resumeBuffer = await getResumeBuffer(application.resumeKey);
+  if (kind === "match-score" && input.resumeBuffer) extra.resumeBuffer = input.resumeBuffer;
+  else if (kind === "match-score" && application.resumeKey) extra.resumeBuffer = await getResumeBuffer(application.resumeKey);
   return extra;
 }
 
@@ -285,6 +297,19 @@ router.post("/:id/:kind/stream", generationLimiter, async (req, res, next) => {
     if (!application) return res.status(404).json({ error: "Application not found" });
     return streamGeneration(req, res, application, kind, await generationExtra(application, kind, req.body));
   } catch (error) { return next(error); }
+});
+
+router.post("/:id/match-score", generationLimiter, resumeUpload.single("resume"), async (req, res, next) => {
+  try {
+    const application = await applicationForUser(req.params.id, req.user.id);
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    if (req.file && req.file.buffer.subarray(0, 5).toString() !== "%PDF-") return res.status(400).json({ error: "Upload a valid PDF file" });
+    const extra = await generationExtra(application, "match-score", {
+      jobDescription: req.body?.jobDescription,
+      resumeBuffer: req.file?.buffer
+    });
+    return res.json(await generate(application, "match-score", extra));
+  } catch (error) { return handleError(error, next, res); }
 });
 
 router.post("/:id/:kind", generationLimiter, async (req, res, next) => {

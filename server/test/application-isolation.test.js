@@ -183,6 +183,13 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(matchScore.response.status, 200);
   assert.equal(typeof matchScore.data.result.score, "number");
 
+  const oneTimeResume = new FormData();
+  oneTimeResume.append("jobDescription", "Looking for React Node engineer with AWS and testing experience");
+  oneTimeResume.append("resume", new Blob([Buffer.from("%PDF-1.7\nApplywise one-time resume")], { type: "application/pdf" }), "resume.pdf");
+  const uploadedMatchScore = await request(`/ai/${created[0]._id}/match-score`, { token: userA.token, method: "POST", body: oneTimeResume });
+  assert.equal(uploadedMatchScore.response.status, 200);
+  assert.equal(typeof uploadedMatchScore.data.result.score, "number", "One-time PDF analysis must return a structured score");
+
   const quickCreate = await request("/applications/quick", {
     token: userA.token,
     method: "POST",
