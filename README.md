@@ -6,6 +6,24 @@ Live app and API: [applywise-flax.vercel.app](https://applywise-flax.vercel.app)
 
 The interface uses teal glass panels and supports day and night modes. Its public landing page includes an animated product feature grid, AI workflow preview, scroll-triggered proof metrics, and focused conversion CTA. The dedicated AI Career Studio at `/ai-tools` keeps Cover Letter and Resume Match workflows easy to find outside the Kanban cards. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
 
+## Product tour
+
+### Premium landing experience
+
+![Applywise landing page](docs/screenshots/landing-page.png)
+
+### Kanban pipeline with drag feedback
+
+![Applywise Kanban pipeline](docs/screenshots/kanban-pipeline.png)
+
+### AI Career Studio
+
+![Applywise AI Career Studio](docs/screenshots/ai-career-studio.png)
+
+### Actionable analytics
+
+![Applywise analytics dashboard](docs/screenshots/analytics-dashboard.png)
+
 ## Stack
 
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
