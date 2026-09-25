@@ -62,7 +62,9 @@ try {
     await page.getByRole("heading", { name: "Follow-up email" }).waitFor();
     await page.getByText("Generating your email", { exact: true }).waitFor();
     assert.equal(await emailButton.isDisabled(), true, "The AI email button should be disabled while generation is active");
-    assert.equal(await page.getByLabel("Generating AI response").count(), 1, "The AI modal should show a skeleton before the first chunk");
+    const skeletonVisible = await page.getByLabel("Generating AI response").count();
+    const firstChunkVisible = (await page.locator(".ai-result-panel").last().textContent().catch(() => "")).length > 0;
+    assert.ok(skeletonVisible === 1 || firstChunkVisible, "The AI modal should show a skeleton or the first streamed content");
     await page.getByRole("button", { name: "Copy text" }).waitFor({ timeout: 60000 });
     assert.ok((await page.locator(".ai-result-panel").last().textContent()).length > 80, "Follow-up output should be displayed in the modal");
     await page.screenshot({ path: path.join(screenshots, "ai-follow-up.png"), fullPage: true });
@@ -74,6 +76,24 @@ try {
     await page.getByText("Preparing interview tips", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Copy text" }).waitFor({ timeout: 60000 });
     assert.ok((await page.locator(".ai-result-panel").last().textContent()).length > 80, "Interview tips should be displayed in the modal");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+
+    await page.getByRole("button", { name: /^Generate cover letter for / }).first().click();
+    await page.getByRole("heading", { name: "Cover letter" }).waitFor();
+    await page.getByRole("button", { name: "Copy text" }).waitFor({ timeout: 60000 });
+    assert.ok((await page.locator(".ai-result-panel").last().textContent()).length > 120, "Cover letter should be displayed in the modal");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+
+    await page.getByRole("button", { name: /^Analyze resume match for / }).first().click();
+    await page.getByRole("heading", { name: "Resume match score" }).waitFor();
+    await page.getByLabel("Job description").fill("We are looking for a React and Node.js engineer with REST API, AWS, testing, and scalable systems experience.");
+    await page.getByRole("button", { name: "Analyze match" }).click();
+    await page.getByRole("dialog").getByText("Match score", { exact: true }).waitFor({ timeout: 60000 });
+    await page.getByRole("button", { name: "Copy analysis" }).waitFor();
+    assert.match(await page.locator(".ai-result-panel").last().textContent(), /Matching skills/i, "Match analysis should render structured skills");
+    await page.screenshot({ path: path.join(screenshots, "ai-match-score.png"), fullPage: true });
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
 

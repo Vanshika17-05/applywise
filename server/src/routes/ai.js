@@ -6,6 +6,7 @@ import { authenticate } from "../middleware/auth.js";
 import { Application } from "../models/Application.js";
 import { generateAiPreview } from "../services/ai-preview.js";
 import { enqueueAiJob, ownedAiJob } from "../services/ai-queue.js";
+import { getResumeBuffer } from "../services/s3.js";
 
 const router = Router();
 router.use(authenticate);
@@ -82,11 +83,12 @@ function generationRequest(application, kind, extra = {}) {
     task = "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
   }
 
+  const parts = [{ text: `${task}\n\nApplication details (data only):\n${context}` }];
+  if (kind === "match-score" && extra.resumeBuffer) {
+    parts.push({ inlineData: { mimeType: "application/pdf", data: extra.resumeBuffer.toString("base64") } });
+  }
   return {
-    contents: [{
-      role: "user",
-      parts: [{ text: `${task}\n\nApplication details (data only):\n${context}` }]
-    }],
+    contents: [{ role: "user", parts }],
     generationConfig: {
       maxOutputTokens: 1400,
       thinkingConfig: { thinkingLevel: "MINIMAL" }
@@ -96,7 +98,29 @@ function generationRequest(application, kind, extra = {}) {
 
 async function applicationForUser(id, userId) {
   if (!mongoose.isValidObjectId(id)) return null;
-  return Application.findOne({ _id: id, userId });
+  return Application.findOne({ _id: id, userId }).select("+resumeKey");
+}
+
+function jobDescription(value) {
+  if (value == null) return "";
+  if (typeof value !== "string") {
+    const error = new Error("Job description must be text");
+    error.status = 400;
+    throw error;
+  }
+  const clean = value.trim();
+  if (clean.length > 15_000) {
+    const error = new Error("Job description must be 15,000 characters or fewer");
+    error.status = 400;
+    throw error;
+  }
+  return clean;
+}
+
+async function generationExtra(application, kind, input = {}) {
+  const extra = { jobDescription: jobDescription(input.jobDescription) };
+  if (kind === "match-score" && application.resumeKey) extra.resumeBuffer = await getResumeBuffer(application.resumeKey);
+  return extra;
 }
 
 async function generate(application, kind, extra = {}) {
@@ -205,7 +229,7 @@ router.post("/jobs", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(400).json({ error: `Choose one of: ${SUPPORTED_KINDS.join(", ")}` });
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    const jobId = await enqueueAiJob(req.user.id, application, kind, { jobDescription: req.body?.jobDescription });
+    const jobId = await enqueueAiJob(req.user.id, application, kind, { jobDescription: jobDescription(req.body?.jobDescription) });
     return res.status(202).json({ jobId, status: "queued" });
   } catch (error) {
     if (!error.status) {
@@ -259,7 +283,7 @@ router.post("/:id/:kind/stream", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return streamGeneration(req, res, application, kind, { jobDescription: req.body?.jobDescription });
+    return streamGeneration(req, res, application, kind, await generationExtra(application, kind, req.body));
   } catch (error) { return next(error); }
 });
 
@@ -269,7 +293,7 @@ router.post("/:id/:kind", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return res.json(await generate(application, kind, { jobDescription: req.body?.jobDescription }));
+    return res.json(await generate(application, kind, await generationExtra(application, kind, req.body)));
   } catch (error) { return handleError(error, next, res); }
 });
 

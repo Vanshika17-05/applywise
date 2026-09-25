@@ -82,7 +82,8 @@ export async function uploadResume(userId, file) {
 export async function finalizeResumeUpload(userId, file) {
   if (!file) return { resumeKey: undefined, resumeUrl: undefined };
   if (file.key) {
-    if (file.contentType !== "application/pdf") {
+    const uploaded = file.contentType === "application/pdf" ? await getResumeBuffer(file.key) : null;
+    if (!uploaded || uploaded.subarray(0, 5).toString() !== "%PDF-") {
       await deleteResume(file.key);
       const error = new Error("Upload a valid PDF file");
       error.status = 400;

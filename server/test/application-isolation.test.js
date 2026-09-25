@@ -5,7 +5,7 @@ import { MongoMemoryServer } from "mongodb-memory-server-core";
 import { createApp } from "../src/app.js";
 import { connectDatabase } from "../src/config/db.js";
 import { Application } from "../src/models/Application.js";
-import { createResumeStorage, deleteResume, finalizeResumeUpload } from "../src/services/s3.js";
+import { createResumeStorage, deleteResume, finalizeResumeUpload, getResumeBuffer } from "../src/services/s3.js";
 import { generateQueuedAi } from "../src/services/queued-ai.js";
 
 let mongo;
@@ -99,6 +99,7 @@ test("applications are isolated by the authenticated user ID", async () => {
     buffer: Buffer.from("%PDF-1.7\nApplywise test PDF")
   });
   assert.match(localResume.resumeKey, /^local\//);
+  assert.match((await getResumeBuffer(localResume.resumeKey)).toString(), /^%PDF-/);
   await deleteResume(localResume.resumeKey);
   await assert.rejects(() => finalizeResumeUpload(userA.user.id, {
     mimetype: "application/pdf",
@@ -134,6 +135,10 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.equal(aiByB.response.status, 404);
   const queueByB = await request("/ai/jobs", { token: userB.token, method: "POST", body: { applicationId: created[0]._id, kind: "follow-up" } });
   assert.equal(queueByB.response.status, 404, "User B must not enqueue AI work for User A's application");
+  const coverByB = await request(`/ai/${created[0]._id}/cover-letter`, { token: userB.token, method: "POST" });
+  assert.equal(coverByB.response.status, 404, "User B must not generate a cover letter for User A's application");
+  const scoreByB = await request(`/ai/${created[0]._id}/match-score`, { token: userB.token, method: "POST", body: { jobDescription: "React and Node.js" } });
+  assert.equal(scoreByB.response.status, 404, "User B must not analyze User A's application");
   const queueUnavailable = await request("/ai/jobs", { token: userA.token, method: "POST", body: { applicationId: created[0]._id, kind: "follow-up" } });
   assert.equal(queueUnavailable.response.status, 503, "The API must fail over cleanly when Redis is not configured");
   const workerPreview = await generateQueuedAi({
@@ -185,6 +190,9 @@ test("applications are isolated by the authenticated user ID", async () => {
   });
   assert.equal(quickCreate.response.status, 201);
   assert.equal(quickCreate.data.application.company, "Amazon");
+
+  const listBAfterQuickCreate = await request("/applications", { token: userB.token });
+  assert.deepEqual(listBAfterQuickCreate.data.applications, [], "Quick Add must remain isolated from other tenants");
 
   const listA = await request("/applications", { token: userA.token });
   assert.equal(listA.response.status, 200);

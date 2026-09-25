@@ -39,7 +39,8 @@ export async function enqueueAiJob(userId, application, kind, extra = {}) {
       role: application.role,
       dateApplied: application.dateApplied.toISOString(),
       status: application.status,
-      notes: application.notes || ""
+      notes: application.notes || "",
+      resumeKey: application.resumeKey || ""
     }
   });
   return job.id;

@@ -66,6 +66,13 @@ services:
       AI_DEMO_MODE: ${AI_DEMO_MODE:-true}
       AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-4}
       AI_WORKER_RATE_LIMIT: ${AI_WORKER_RATE_LIMIT:-20}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      RESUME_STORAGE: ${RESUME_STORAGE:-local}
+    volumes:
+      - resume_data:/app/server/.local/resumes:ro
     depends_on:
       redis:
         condition: service_healthy

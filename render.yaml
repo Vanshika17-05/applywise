@@ -49,3 +49,13 @@ services:
         value: "4"
       - key: AI_WORKER_RATE_LIMIT
         value: "20"
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_S3_BUCKET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: RESUME_STORAGE
+        value: s3
