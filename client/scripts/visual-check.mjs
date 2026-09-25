@@ -26,12 +26,52 @@ try {
   await page.waitForTimeout(650);
   assert.notEqual(await beam.getAttribute("x1"), beamPosition, "Background beams should move over time");
 
+  await page.locator("#features").scrollIntoViewIfNeeded();
+  await page.getByRole("heading", { name: "Everything your job search needs" }).waitFor();
+  assert.equal(await page.locator(".landing-feature-card").count(), 3, "The landing page should show three feature cards");
+  await page.getByRole("heading", { name: "Your AI toolkit, built in" }).scrollIntoViewIfNeeded();
+  await page.getByText("One-click cover letters tailored to each company and role").waitFor();
+  await page.getByText("Job seekers using Applywise").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1250);
+  assert.match(await page.locator(".landing-stat").first().textContent(), /500\+/, "Social proof should count up to 500+");
+  await page.getByRole("heading", { name: "Ready to take control of your job search?" }).scrollIntoViewIfNeeded();
+  const githubLink = page.getByRole("link", { name: "Applywise creator on GitHub" });
+  const linkedinLink = page.getByRole("link", { name: "Applywise creator on LinkedIn" });
+  await githubLink.scrollIntoViewIfNeeded();
+  assert.equal(await githubLink.getAttribute("href"), "https://github.com/Vanshika17-05");
+  assert.equal(await linkedinLink.getAttribute("href"), "https://in.linkedin.com/in/vanshikasambher");
+  await page.screenshot({ path: path.join(screenshots, "landing-page-dark.png"), fullPage: true });
+  await page.getByRole("button", { name: "See how it works" }).click();
+  await page.waitForTimeout(500);
+
   await page.getByRole("button", { name: "Switch to light mode" }).click();
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
   await page.screenshot({ path: path.join(screenshots, "auth-light.png") });
+
+  const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  await mobilePage.goto(`${base}/auth`, { waitUntil: "networkidle" });
+  await mobilePage.getByRole("heading", { name: "Everything your job search needs" }).scrollIntoViewIfNeeded();
+  assert.equal(await mobilePage.locator(".landing-feature-card").count(), 3);
+  for (const card of await mobilePage.locator(".landing-feature-card").all()) {
+    await card.scrollIntoViewIfNeeded();
+    await mobilePage.waitForTimeout(220);
+  }
+  await mobilePage.getByRole("heading", { name: "Your AI toolkit, built in" }).scrollIntoViewIfNeeded();
+  await mobilePage.locator(".landing-ai-mockup").scrollIntoViewIfNeeded();
+  await mobilePage.waitForTimeout(500);
+  for (const stat of await mobilePage.locator(".landing-stat").all()) {
+    await stat.scrollIntoViewIfNeeded();
+    await mobilePage.waitForTimeout(450);
+  }
+  assert.match(await mobilePage.locator(".landing-stat").first().textContent(), /500\+/, "Mobile social proof should finish its count-up");
+  await mobilePage.getByRole("heading", { name: "Ready to take control of your job search?" }).scrollIntoViewIfNeeded();
+  await mobilePage.getByRole("link", { name: "Applywise creator on GitHub" }).scrollIntoViewIfNeeded();
+  await mobilePage.waitForTimeout(400);
+  await mobilePage.screenshot({ path: path.join(screenshots, "landing-page-mobile.png"), fullPage: true });
+  await mobilePage.close();
 
   if (process.env.DEMO_EMAIL && process.env.DEMO_PASSWORD) {
     await page.getByLabel("Email address").fill(process.env.DEMO_EMAIL);

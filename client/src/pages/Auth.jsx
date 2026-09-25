@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BackgroundBeams } from "@/components/ui/background-beams";
+import LandingSections from "@/components/LandingSections";
 
 const preview = [
   { name: "Product Designer", company: "Linear", color: "brand-mark", status: "Interview" },
@@ -30,7 +31,7 @@ export default function Auth() {
     finally { setBusy(false); }
   }
 
-  return <div className="grid min-h-screen page-bg lg:grid-cols-[1.06fr_.94fr]">
+  return <div className="min-h-screen page-bg"><div className="grid min-h-screen page-bg lg:grid-cols-[1.06fr_.94fr]">
     <ThemeToggle className="fixed right-6 top-6 z-40 sm:right-10 sm:top-10" />
     <div className="relative hidden overflow-hidden border-r border-theme glass-strong px-10 py-10 lg:flex lg:flex-col xl:px-16">
       <div aria-hidden="true" className="hero-aurora pointer-events-none absolute inset-0" />
@@ -73,5 +74,5 @@ export default function Auth() {
         <div className="mt-12 flex items-center justify-center gap-2 text-xs text-faint"><Check size={14} className="text-[var(--offer)]" /> Your applications stay private to your account</div>
       </motion.div>
     </div>
-  </div>;
+  </div><LandingSections /></div>;
 }
