@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth.js";
 import applicationRoutes from "./routes/applications.js";
 import aiRoutes from "./routes/ai.js";
 import analyticsRoutes from "./routes/analytics.js";
+import uploadRoutes from "./routes/upload.js";
 import { notFound, errorHandler } from "./middleware/errors.js";
 
 export function createApp() {
@@ -18,6 +19,7 @@ export function createApp() {
   app.use("/api/auth", authRoutes);
   app.use("/api/applications", applicationRoutes);
   app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/upload", uploadRoutes);
   app.use("/api/ai", aiRoutes);
   app.use(notFound);
   app.use(errorHandler);

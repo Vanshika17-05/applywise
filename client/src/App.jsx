@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "@/state/auth";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const Workspace = lazy(() => import("@/pages/Workspace"));
@@ -12,7 +13,7 @@ function AppSkeleton() {
   </div>;
 }
 
-export default function App() {
+function AppRoutes() {
   const { session, checking } = useAuth();
   const location = useLocation();
   useEffect(() => {
@@ -24,4 +25,8 @@ export default function App() {
     <Route path="/auth" element={session ? <Navigate to="/" replace /> : <Auth />} />
     <Route path="/*" element={session ? <Workspace /> : <Navigate to="/auth" replace />} />
   </Routes></Suspense>;
+}
+
+export default function App() {
+  return <ThemeProvider><AppRoutes /></ThemeProvider>;
 }

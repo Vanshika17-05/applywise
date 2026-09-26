@@ -118,14 +118,18 @@ test("applications are isolated by the authenticated user ID", async () => {
   assert.match((await getResumeBuffer(mongoResumeKey)).toString(), /GridFS resume/);
   await deleteResume(mongoResumeKey);
 
+  const nameUpdate = await request("/auth/profile", { token: userA.token, method: "PUT", body: { name: "User Alpha" } });
+  assert.equal(nameUpdate.response.status, 200);
+  assert.equal(nameUpdate.data.user.name, "User Alpha");
   const profileForm = new FormData();
-  profileForm.set("name", "User Alpha");
   profileForm.set("photo", new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")], { type: "image/png" }), "avatar.png");
-  const profileUpdate = await request("/auth/profile", { token: userA.token, method: "PATCH", body: profileForm });
-  assert.equal(profileUpdate.response.status, 200);
-  assert.equal(profileUpdate.data.user.name, "User Alpha");
-  assert.match(profileUpdate.data.user.photoUrl, /\/api\/auth\/photo\/view\?token=/);
-  const photoResponse = await fetch(profileUpdate.data.user.photoUrl);
+  const photoUpload = await request("/upload/profile-photo", { token: userA.token, method: "POST", body: profileForm });
+  assert.equal(photoUpload.response.status, 201);
+  assert.match(photoUpload.data.url, /\/api\/auth\/photo\/view\?token=/);
+  const refreshedProfile = await request("/auth/me", { token: userA.token });
+  assert.equal(refreshedProfile.data.user.name, "User Alpha");
+  assert.match(refreshedProfile.data.user.photoUrl, /\/api\/auth\/photo\/view\?token=/);
+  const photoResponse = await fetch(refreshedProfile.data.user.photoUrl);
   assert.equal(photoResponse.status, 200, "MongoDB-backed profile photo must be readable through its signed URL");
   assert.equal(photoResponse.headers.get("content-type"), "image/png");
   process.env.NODE_ENV = previousNodeEnv;
@@ -142,6 +146,24 @@ test("applications are isolated by the authenticated user ID", async () => {
   const listB = await request("/applications", { token: userB.token });
   assert.equal(listB.response.status, 200);
   assert.deepEqual(listB.data.applications, [], "User B must not receive User A's applications");
+
+  const resumeForm = new FormData();
+  resumeForm.set("applicationId", created[0]._id);
+  resumeForm.set("resume", new Blob([Buffer.from("%PDF-1.7\nApplywise replacement resume")], { type: "application/pdf" }), "candidate-resume.pdf");
+  const resumeUpload = await request("/upload/resume", { token: userA.token, method: "POST", body: resumeForm });
+  assert.equal(resumeUpload.response.status, 201);
+  assert.equal(resumeUpload.data.application.resumeName, "candidate-resume.pdf");
+
+  const otherTenantResume = new FormData();
+  otherTenantResume.set("applicationId", created[0]._id);
+  otherTenantResume.set("resume", new Blob([Buffer.from("%PDF-1.7\nForbidden replacement")], { type: "application/pdf" }), "forbidden.pdf");
+  const resumeByB = await request("/upload/resume", { token: userB.token, method: "POST", body: otherTenantResume });
+  assert.equal(resumeByB.response.status, 404, "A user must not replace another tenant's resume");
+  const deleteResumeByB = await request(`/upload/resume/${created[0]._id}`, { token: userB.token, method: "DELETE" });
+  assert.equal(deleteResumeByB.response.status, 404, "A user must not delete another tenant's resume");
+  const removedResume = await request(`/upload/resume/${created[0]._id}`, { token: userA.token, method: "DELETE" });
+  assert.equal(removedResume.response.status, 200);
+  assert.equal(removedResume.data.application.resumeName, "");
 
   const analyticsB = await request("/analytics?range=custom&from=2026-09-24&to=2026-09-24", { token: userB.token });
   assert.equal(analyticsB.response.status, 200);

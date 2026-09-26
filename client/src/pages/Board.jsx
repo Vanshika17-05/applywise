@@ -83,7 +83,7 @@ function ApplicationCard({ application, index, token, onEdit, onDelete, onAI, ac
   </Draggable>;
 }
 
-export default function Board({ applications, loading, token, userName = "", onCreate, onEdit, onDelete, onMove }) {
+export default function Board({ applications, loading, token, userName = "", userPhoto = "", onCreate, onEdit, onDelete, onMove }) {
   const [search, setSearch] = useState("");
   const [ai, setAI] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -216,7 +216,7 @@ export default function Board({ applications, loading, token, userName = "", onC
   return <div>
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="hero-glass dashboard-hero relative overflow-hidden rounded-[28px] p-6 sm:p-8">
       <div className="hero-glow pointer-events-none absolute -right-10 -top-24 size-80 rounded-full" />
-      <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><div className="accent-pill mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"><Sparkles size={12} /> Your workspace</div><h1 className="text-2xl font-bold tracking-[-.035em] sm:text-3xl">Good to see you, {firstName}.</h1><p className="mt-2 max-w-xl text-sm text-muted">Your opportunities, organized from first application to final decision.</p></div><Button asChild variant="secondary" className="self-start sm:self-auto"><Link to="/ai-tools"><Sparkles size={16} /> Open AI Career Studio</Link></Button></div>
+      <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div className="flex items-center gap-4"><span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--accent-border)] bg-accent-soft text-lg font-bold text-accent">{userPhoto ? <img src={userPhoto} alt="" className="size-full object-cover" /> : firstName[0]?.toUpperCase()}</span><div><div className="accent-pill mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"><Sparkles size={12} /> Your workspace</div><h1 className="text-2xl font-bold tracking-[-.035em] sm:text-3xl">Good to see you, {firstName}.</h1><p className="mt-2 max-w-xl text-sm text-muted">Your opportunities, organized from first application to final decision.</p></div></div><Button asChild variant="secondary" className="self-start sm:self-auto"><Link to="/ai-tools"><Sparkles size={16} /> Open AI Career Studio</Link></Button></div>
     </motion.div>
 
     <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

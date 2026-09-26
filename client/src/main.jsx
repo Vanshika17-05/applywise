@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./state/auth.jsx";
-import { ThemeProvider } from "./state/theme.jsx";
 import App from "./App.jsx";
 import "./index.css";
 
@@ -14,9 +13,7 @@ function ThemedApp() {
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider><ThemedApp /></AuthProvider>
-      </ThemeProvider>
+      <AuthProvider><ThemedApp /></AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

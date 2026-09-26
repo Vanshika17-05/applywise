@@ -1,21 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import jwt from "jsonwebtoken";
+import { awsBucketName, isS3Configured, s3 } from "../config/s3.js";
 
-const client = new S3Client({ region: process.env.AWS_REGION || "ap-south-1" });
 const localRoot = path.resolve(import.meta.dirname, "../../.local/profile-photos");
 const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 function localMode() {
-  if (process.env.AWS_S3_BUCKET) return false;
+  if (isS3Configured) return false;
   return process.env.NODE_ENV !== "production";
 }
 
 export function profilePhotoStorageMode() {
-  if (process.env.AWS_S3_BUCKET) return "s3";
+  if (isS3Configured) return "s3";
   return process.env.NODE_ENV === "production" ? "mongo" : "local";
 }
 
@@ -52,8 +52,8 @@ export async function uploadProfilePhoto(userId, file) {
     return key;
   }
   const key = `profile-photos/${userId}/${randomUUID()}.${extension}`;
-  await client.send(new PutObjectCommand({
-    Bucket: process.env.AWS_S3_BUCKET, Key: key, Body: file.buffer,
+  await s3.send(new PutObjectCommand({
+    Bucket: awsBucketName, Key: key, Body: file.buffer,
     ContentType: file.mimetype, ServerSideEncryption: "AES256"
   }));
   return key;
@@ -66,7 +66,7 @@ export async function getProfilePhotoUrl(key, { userId, origin }) {
     const token = jwt.sign({ sub: userId, purpose: "profile-photo", key }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" });
     return `${origin}/api/auth/photo/view?token=${encodeURIComponent(token)}`;
   }
-  return getSignedUrl(client, new GetObjectCommand({ Bucket: process.env.AWS_S3_BUCKET, Key: key }), { expiresIn: 3600 });
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: awsBucketName, Key: key }), { expiresIn: 3600 });
 }
 
 export async function readLocalProfilePhoto(key) {
@@ -77,5 +77,5 @@ export async function deleteProfilePhoto(key) {
   if (!key) return;
   if (isMongoProfilePhoto(key)) return;
   if (isLocalProfilePhoto(key)) { await unlink(localPath(key)); return; }
-  await client.send(new DeleteObjectCommand({ Bucket: process.env.AWS_S3_BUCKET, Key: key }));
+  await s3.send(new DeleteObjectCommand({ Bucket: awsBucketName, Key: key }));
 }

@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, CircleDashed, LockKeyhole, TrendingUp } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/state/auth";
-import { ThemeToggle } from "@/state/theme";
+import { ThemeToggle } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -7,8 +7,9 @@ export default function AccountMenu({ user, onLogout, mobile = false }) {
   const location = useLocation();
   const firstName = user.name.trim().split(/\s+/)[0] || "Account";
   const accountPage = location.pathname === "/profile" || location.pathname === "/settings";
-  const avatar = user.photoUrl
-    ? <img src={user.photoUrl} alt="" className="size-full rounded-full object-cover" />
+  const photo = user.photoUrl || user.profilePhoto;
+  const avatar = photo
+    ? <img src={photo} alt="" className="size-full rounded-full object-cover" />
     : firstName[0]?.toUpperCase();
 
   return <DropdownMenu>

@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import multerS3 from "multer-s3";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { awsBucketName, awsRegion, isS3Configured, s3 as client } from "../config/s3.js";
 
-const client = new S3Client({ region: process.env.AWS_REGION || "ap-south-1" });
 const localRoot = path.resolve(import.meta.dirname, "../../.local/resumes");
 
 function assertLocalAllowed() {
@@ -26,7 +26,7 @@ function localMode() {
 
 function resumeStorageMode() {
   if (process.env.RESUME_STORAGE === "local") return "local";
-  if (process.env.RESUME_STORAGE === "s3" || process.env.AWS_S3_BUCKET) return "s3";
+  if (process.env.RESUME_STORAGE === "s3" || isS3Configured) return "s3";
   return "mongo";
 }
 
@@ -51,18 +51,17 @@ function localPath(key) {
 }
 
 function bucket() {
-  if (!process.env.AWS_S3_BUCKET) {
+  if (!awsBucketName) {
     const error = new Error("Resume uploads are not configured");
     error.status = 503;
     throw error;
   }
-  return process.env.AWS_S3_BUCKET;
+  return awsBucketName;
 }
 
 function s3ObjectUrl(key) {
-  const region = process.env.AWS_REGION || "ap-south-1";
   const encodedKey = key.split("/").map(encodeURIComponent).join("/");
-  return `https://${bucket()}.s3.${region}.amazonaws.com/${encodedKey}`;
+  return `https://${bucket()}.s3.${awsRegion}.amazonaws.com/${encodedKey}`;
 }
 
 export function createResumeStorage() {
@@ -78,7 +77,7 @@ export function createResumeStorage() {
     serverSideEncryption: "AES256",
     cacheControl: "private, no-store",
     metadata: (req, _file, callback) => callback(null, { ownerId: req.user.id }),
-    key: (req, _file, callback) => callback(null, `resumes/${req.user.id}/${randomUUID()}.pdf`)
+    key: (req, file, callback) => callback(null, `resumes/${req.user.id}-${Date.now()}-${randomUUID()}-${path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, "-")}`)
   });
 }
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, CircleUserRound, Mail, Save, ShieldCheck, UserRound } from "lucide-react";
+import { Camera, CircleUserRound, LoaderCircle, Mail, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import toast from "react-hot-toast";
-import { api } from "@/lib/api";
+import { api, uploadApi } from "@/lib/api";
 import { useAuth } from "@/state/auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ export default function Profile() {
   const [photo, setPhoto] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => setName(session.user.name), [session.user.name]);
   useEffect(() => {
@@ -27,8 +28,8 @@ export default function Profile() {
   function selectPhoto(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024) {
-      toast.error("Choose a JPG, PNG, or WebP image under 2 MB");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 4 * 1024 * 1024) {
+      toast.error("Choose a JPG, PNG, or WebP image under 4 MB");
       event.target.value = "";
       return;
     }
@@ -41,18 +42,35 @@ export default function Profile() {
     if (trimmedName.length < 2 || trimmedName.length > 80) { toast.error("Name must be between 2 and 80 characters"); return; }
     setSaving(true);
     try {
-      const body = new FormData();
-      body.append("name", trimmedName);
-      if (photo) body.append("photo", photo);
-      const { user } = await api("/auth/profile", { token: session.token, method: "PATCH", body });
+      const { user: namedUser } = await api("/auth/profile", { token: session.token, method: "PUT", body: { name: trimmedName } });
+      updateUser(namedUser);
+      if (photo) {
+        const body = new FormData();
+        body.append("photo", photo);
+        setUploadProgress(1);
+        await uploadApi("/upload/profile-photo", { token: session.token, body, onProgress: setUploadProgress });
+        const { user } = await api("/auth/me", { token: session.token });
+        updateUser(user);
+        toast.success("Photo saved successfully");
+      } else toast.success("Profile updated");
+      setPhoto(null);
+    } catch (error) { toast.error(error.message); }
+    finally { setSaving(false); setUploadProgress(0); }
+  }
+
+  async function removePhoto() {
+    setSaving(true);
+    try {
+      await api("/upload/profile-photo", { token: session.token, method: "DELETE" });
+      const { user } = await api("/auth/me", { token: session.token });
       updateUser(user);
       setPhoto(null);
-      toast.success("Profile updated");
+      toast.success("Profile photo removed");
     } catch (error) { toast.error(error.message); }
     finally { setSaving(false); }
   }
 
-  const image = previewUrl || session.user.photoUrl;
+  const image = previewUrl || session.user.photoUrl || session.user.profilePhoto;
   return <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .35 }} className="mx-auto max-w-3xl">
     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-accent"><span className="h-px w-4 bg-[var(--accent)]" /> Your account</div>
     <h1 className="mt-2 text-3xl font-bold tracking-tight">Your profile</h1>
@@ -62,8 +80,8 @@ export default function Profile() {
       <div className="profile-banner relative h-28 border-b border-theme sm:h-36"><div className="absolute bottom-4 left-6 flex items-center gap-2 rounded-full border border-[var(--accent-border)] bg-[var(--glass-strong)] px-3 py-1.5 text-xs font-medium text-accent backdrop-blur-xl"><ShieldCheck size={14} /> Private account</div></div>
       <form onSubmit={save} className="space-y-7 p-5 sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[var(--accent-border)] bg-accent-soft text-4xl font-bold text-accent">{image ? <img src={image} alt="Profile" className="size-full object-cover" /> : session.user.name[0]?.toUpperCase()}</div>
-          <div className="min-w-0"><h2 className="text-lg font-semibold">Profile photo</h2><p className="mt-1 text-sm text-subtle">JPG, PNG or WebP, up to 2 MB.</p><label htmlFor="profile-photo" className="btn-secondary mt-3 inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl px-3 text-xs font-semibold"><Camera size={15} /> Choose photo</label><input id="profile-photo" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPhoto} />{photo && <p className="mt-2 max-w-xs truncate text-xs text-accent">Ready to upload: {photo.name}</p>}</div>
+          <label htmlFor="profile-photo" className="group relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-3xl border border-[var(--accent-border)] bg-accent-soft text-4xl font-bold text-accent" title="Change profile photo">{image ? <img src={image} alt="Profile" className="size-full object-cover" /> : session.user.name[0]?.toUpperCase()}<span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">{saving && photo ? <LoaderCircle size={24} className="animate-spin text-white" /> : <Camera size={22} className="text-white" />}</span></label>
+          <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">Profile photo</h2><p className="mt-1 text-sm text-subtle">Click the avatar to choose JPG, PNG or WebP, up to 4 MB.</p><div className="flex flex-wrap gap-2"><label htmlFor="profile-photo" className="btn-secondary mt-3 inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl px-3 text-xs font-semibold"><Camera size={15} /> Choose photo</label>{(session.user.photoUrl || session.user.profilePhoto) && <button type="button" onClick={removePhoto} disabled={saving} className="mt-3 inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[var(--rejected)] hover:bg-[color-mix(in_srgb,var(--rejected)_10%,transparent)]"><Trash2 size={14} /> Remove photo</button>}</div><input id="profile-photo" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPhoto} disabled={saving} />{photo && <p className="mt-2 max-w-xs truncate text-xs text-accent">Ready to upload: {photo.name}</p>}{uploadProgress > 0 && <div className="mt-3" role="progressbar" aria-label="Photo upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={uploadProgress}><div className="mb-1 flex justify-between text-xs text-faint"><span>Uploading photo</span><span>{uploadProgress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[var(--accent-muted)]"><motion.div className="h-full rounded-full bg-[var(--accent)]" animate={{ width: `${uploadProgress}%` }} /></div></div>}</div>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <div><Label htmlFor="profile-name" className="flex items-center gap-2"><UserRound size={14} /> Full name</Label><Input id="profile-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoComplete="name" required /></div>

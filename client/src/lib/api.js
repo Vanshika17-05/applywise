@@ -21,6 +21,29 @@ export async function api(path, { token, body, ...options } = {}) {
   return data;
 }
 
+export function uploadApi(path, { token, body, onProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `${API_URL}/api${path}`);
+    if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);
+    request.responseType = "json";
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onerror = () => reject(new Error("Cannot reach the server. Check your connection and try again."));
+    request.onload = () => {
+      const data = request.response || {};
+      if (request.status >= 200 && request.status < 300) resolve(data);
+      else {
+        const error = new Error(data.error || "Upload failed");
+        error.status = request.status;
+        reject(error);
+      }
+    };
+    request.send(body);
+  });
+}
+
 export async function downloadApi(path, { token, fallbackName = "applywise-export.csv" } = {}) {
   let response;
   try {

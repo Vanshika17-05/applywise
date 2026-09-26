@@ -165,6 +165,18 @@ try {
     await page.screenshot({ path: path.join(screenshots, "analytics-dark.png"), fullPage: true });
 
     await page.getByRole("button", { name: /^Open account menu for / }).click();
+    await page.getByRole("menuitem", { name: "Profile" }).click();
+    const avatarPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+    await page.locator("#profile-photo").setInputFiles({ name: "avatar.png", mimeType: "image/png", buffer: avatarPng });
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await page.getByText("Photo saved successfully", { exact: true }).waitFor();
+    assert.ok(await page.locator('button[aria-label^="Open account menu for "] img').count(), "Sidebar avatar should update immediately");
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "Your profile" }).waitFor();
+    assert.ok(await page.locator('button[aria-label^="Open account menu for "] img').count(), "Profile photo should persist after refresh");
+    await page.screenshot({ path: path.join(screenshots, "profile-photo-saved.png"), fullPage: true });
+
+    await page.getByRole("button", { name: /^Open account menu for / }).click();
     await page.getByRole("menuitem", { name: "Settings" }).click();
     await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();
     for (const label of ["Workspace", "Pipeline", "Applied"]) {

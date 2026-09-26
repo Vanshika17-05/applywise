@@ -30,7 +30,7 @@ async function publicUser(user, req) {
       photoUrl = await getProfilePhotoUrl(user.photoKey, { userId: user.id, origin: `${req.protocol}://${req.get("host")}` });
     } catch (error) { console.error("Could not create profile photo link", error); }
   }
-  return { id: user.id, name: user.name, email: user.email, photoUrl, emailNotifications: user.emailNotifications !== false };
+  return { id: user.id, name: user.name, email: user.email, photoUrl, profilePhoto: photoUrl, emailNotifications: user.emailNotifications !== false };
 }
 
 router.get("/photo/view", async (req, res, next) => {
@@ -82,7 +82,7 @@ router.get("/me", authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.patch("/profile", authenticate, photoUpload.single("photo"), async (req, res, next) => {
+async function updateProfile(req, res, next) {
   try {
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -112,7 +112,10 @@ router.patch("/profile", authenticate, photoUpload.single("photo"), async (req, 
     if (newPhoto && previousPhoto) await deleteProfilePhoto(previousPhoto).catch((error) => console.error("Could not remove previous profile photo", error));
     res.json({ user: await publicUser(user, req) });
   } catch (error) { next(error); }
-});
+}
+
+router.patch("/profile", authenticate, photoUpload.single("photo"), updateProfile);
+router.put("/profile", authenticate, photoUpload.single("photo"), updateProfile);
 
 router.patch("/settings", authenticate, async (req, res, next) => {
   try {

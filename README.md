@@ -20,6 +20,10 @@ The interface uses teal glass panels and supports synchronized day and night mod
 
 ![Applywise Kanban pipeline](docs/screenshots/kanban-pipeline.png)
 
+### Persistent profile photos
+
+![Applywise profile photo settings](docs/screenshots/profile-photo-saved.png)
+
 ### AI Career Studio
 
 ![Applywise AI Career Studio](docs/screenshots/ai-career-studio.png)
@@ -73,13 +77,32 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails, interview tips, cover letters, resume matching, and analytics insights |
 | `GEMINI_MODEL` | Gemini model; defaults to `gemini-3.5-flash-lite` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
-| `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
+| `AWS_REGION`, `AWS_BUCKET_NAME` | Private S3 bucket location (`AWS_S3_BUCKET` remains supported as an alias) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
 | `RESUME_STORAGE` | Optional override: `local` for development files or `s3` for AWS S3; without S3, production uses private MongoDB GridFS |
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. Resume Match previews intentionally return no percentage because a demo must not look like a real analysis. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, configured S3 credentials store private files with AES-256 server-side encryption; without S3, resumes use private MongoDB GridFS and profile photos use protected MongoDB binary storage behind signed URLs. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. Resume Match previews intentionally return no percentage because a demo must not look like a real analysis. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, configured S3 credentials store private files with AES-256 server-side encryption; without S3, resumes use private MongoDB GridFS and profile photos use protected MongoDB binary storage behind signed URLs. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 4 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+
+### S3 bucket CORS
+
+Paste this into **S3 → Permissions → Cross-origin resource sharing (CORS)**:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+    "AllowedOrigins": [
+      "https://applywise-flax.vercel.app",
+      "http://localhost:5173"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
 
 ## Deployment
 
@@ -89,7 +112,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
 3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up, Tips, Cover Letter, Resume Match, and LangChain career insight generation. `GEMINI_MODEL` defaults to the low-latency model `gemini-3.5-flash-lite`.
 4. Add a managed Redis connection as `REDIS_URL` to enable the five-minute production analytics cache. The API remains available without Redis and reports a cache bypass.
-5. Optionally create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`. When omitted, production uploads remain functional through MongoDB storage.
+5. Optionally create a private S3 bucket and add `AWS_REGION`, `AWS_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`. When omitted, production uploads remain functional through MongoDB storage.
 6. Redeploy after changing environment variables.
 
 The application saves accounts, profile preferences, and applications in MongoDB Atlas. Status changes always update through the REST API and show a toast. For cross-client Socket.io events in production, set `VITE_SOCKET_URL` to a persistent Socket.io service; local Docker and Node development use the included Socket.io server directly.
@@ -104,6 +127,10 @@ BullMQ requires a long-running worker process. The included `render.yaml` define
 | `POST` | `/api/auth/login` | Get JWT |
 | `GET` | `/api/auth/me` | Validate current session |
 | `PATCH` | `/api/auth/profile` | Update name and optional profile photo |
+| `PUT` | `/api/auth/profile` | Update the signed-in user's name |
+| `POST`, `DELETE` | `/api/upload/profile-photo` | Save or remove the signed-in user's profile photo using private S3 or the MongoDB fallback |
+| `POST` | `/api/upload/resume` | Replace an application's resume; multipart fields are `applicationId` and `resume` |
+| `DELETE` | `/api/upload/resume/:applicationId` | Remove the signed-in user's resume from one application |
 | `PATCH` | `/api/auth/settings` | Save email notification preference |
 | `GET`, `POST` | `/api/applications` | List or create applications |
 | `POST` | `/api/applications/quick` | Create an owned application from a browser extension or automation |
