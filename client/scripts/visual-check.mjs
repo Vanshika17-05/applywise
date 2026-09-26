@@ -29,6 +29,7 @@ try {
   await page.locator("#features").scrollIntoViewIfNeeded();
   await page.getByRole("heading", { name: "Everything your job search needs" }).waitFor();
   assert.equal(await page.locator(".landing-feature-card").count(), 3, "The landing page should show three feature cards");
+  const darkLandingBackground = await page.locator(".landing-extended").evaluate((element) => getComputedStyle(element).backgroundColor);
   await page.getByRole("heading", { name: "Your AI toolkit, built in" }).scrollIntoViewIfNeeded();
   await page.getByText("One-click cover letters tailored to each company and role").waitFor();
   await page.getByText("Job seekers using Applywise").scrollIntoViewIfNeeded();
@@ -49,7 +50,21 @@ try {
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
   assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+  assert.equal(await page.evaluate(() => localStorage.getItem("applywise-theme")), "light", "Theme choice must persist globally");
+  const lightLandingBackground = await page.locator(".landing-extended").evaluate((element) => getComputedStyle(element).backgroundColor);
+  assert.notEqual(lightLandingBackground, darkLandingBackground, "Landing sections must respond to the global light theme");
   await page.screenshot({ path: path.join(screenshots, "auth-light.png") });
+  for (const target of [
+    page.getByRole("heading", { name: "Everything your job search needs" }),
+    page.getByRole("heading", { name: "Your AI toolkit, built in" }),
+    page.getByText("Job seekers using Applywise"),
+    page.getByRole("heading", { name: "Ready to take control of your job search?" }),
+    page.getByRole("link", { name: "Applywise creator on GitHub" })
+  ]) {
+    await target.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+  }
+  await page.screenshot({ path: path.join(screenshots, "landing-page-light.png"), fullPage: true });
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   await mobilePage.goto(`${base}/auth`, { waitUntil: "networkidle" });

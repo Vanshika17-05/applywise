@@ -68,7 +68,7 @@ export default function LandingSections() {
     document.getElementById("features")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
   }
 
-  return <div className="landing-extended relative overflow-hidden bg-[#0a0f0e] text-[#effbf8]">
+  return <div className="landing-extended relative overflow-hidden">
     <div aria-hidden="true" className="landing-grid pointer-events-none absolute inset-0" />
 
     <motion.section id="features" {...motionProps} variants={reveal} className="relative mx-auto max-w-7xl px-6 py-24 sm:px-10 lg:px-12 lg:py-28">
@@ -78,14 +78,14 @@ export default function LandingSections() {
       </motion.div>
     </motion.section>
 
-    <section className="relative border-y border-white/6 bg-[#0d1513]">
+    <section className="landing-ai-section relative border-y border-theme">
       <div className="mx-auto grid max-w-7xl items-center gap-14 px-6 py-24 sm:px-10 lg:grid-cols-[.88fr_1.12fr] lg:px-12 lg:py-32">
         <motion.div initial={reduceMotion ? false : { opacity: 0, x: -34 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: .3 }} transition={{ duration: .68, ease: [0.22, 1, 0.36, 1] }}><p className="landing-eyebrow">Intelligence, in context</p><h2 className="mt-4 text-3xl font-extrabold tracking-[-.045em] sm:text-5xl">Your AI toolkit, built in</h2><p className="mt-5 max-w-xl text-base leading-relaxed text-[#8fa6a1] sm:text-lg">Stop switching between tools. Applywise brings AI directly into your job search workflow.</p><ul className="mt-8 space-y-4">{toolkit.map((item) => <li key={item} className="flex items-start gap-3 text-sm leading-relaxed text-[#c2d2ce] sm:text-base"><span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-[#00d4aa]/25 bg-[#00d4aa]/10 text-[#00d4aa]"><CheckCircle2 size={14} /></span>{item}</li>)}</ul><Button asChild size="lg" className="mt-9"><a href="/auth">Try it free <ArrowRight size={16} /></a></Button></motion.div>
         <motion.div initial={reduceMotion ? false : { opacity: 0, x: 34 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: .25 }} transition={{ duration: .72, ease: [0.22, 1, 0.36, 1] }}><AiToolsMockup /></motion.div>
       </div>
     </section>
 
-    <motion.section {...motionProps} variants={reveal} className="relative mx-auto max-w-7xl px-6 py-24 sm:px-10 lg:px-12 lg:py-28"><div className="overflow-hidden rounded-[30px] border border-white/8 bg-[#0c1412]"><div className="grid sm:grid-cols-3"><Stat value={500} suffix="+" label="Job seekers using Applywise" /><Stat value={3} suffix="x" label="More organized than spreadsheets" /><Stat value={2} suffix=" min" label="Average time to add an application" /></div></div></motion.section>
+    <motion.section {...motionProps} variants={reveal} className="relative mx-auto max-w-7xl px-6 py-24 sm:px-10 lg:px-12 lg:py-28"><div className="landing-stats-shell overflow-hidden rounded-[30px] border border-theme"><div className="grid sm:grid-cols-3"><Stat value={500} suffix="+" label="Job seekers using Applywise" /><Stat value={3} suffix="x" label="More organized than spreadsheets" /><Stat value={2} suffix=" min" label="Average time to add an application" /></div></div></motion.section>
 
     <motion.section {...motionProps} variants={reveal} className="relative px-6 pb-24 sm:px-10 lg:px-12 lg:pb-28"><div className="landing-final-cta relative mx-auto max-w-7xl overflow-hidden rounded-[34px] border border-[#00d4aa]/20 px-6 py-16 text-center sm:px-12 sm:py-20"><div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,212,170,.18),transparent_38%),radial-gradient(circle_at_82%_80%,rgba(24,112,137,.18),transparent_40%)]" /><div className="relative"><p className="landing-eyebrow">Your next move starts here</p><h2 className="mx-auto mt-4 max-w-3xl text-3xl font-extrabold tracking-[-.05em] sm:text-5xl">Ready to take control of your job search?</h2><p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-[#92aaa5] sm:text-lg">Join thousands of job seekers who track smarter with Applywise.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><Button asChild size="lg"><a href="/auth">Get started free <ArrowRight size={16} /></a></Button><Button size="lg" variant="secondary" onClick={scrollToFeatures}>See how it works</Button></div></div></div></motion.section>
 

@@ -6,7 +6,7 @@ import multer from "multer";
 import { z } from "zod";
 import { User } from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
-import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, readLocalProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
+import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, isMongoProfilePhoto, readLocalProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
 
 const router = Router();
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
@@ -37,14 +37,15 @@ router.get("/photo/view", async (req, res, next) => {
   let payload;
   try { payload = jwt.verify(req.query.token || "", process.env.JWT_SECRET, { algorithms: ["HS256"] }); }
   catch { return res.status(401).json({ error: "Profile photo link is invalid or expired" }); }
-  if (payload.purpose !== "profile-photo" || !isLocalProfilePhoto(payload.key) || process.env.NODE_ENV === "production") {
+  if (payload.purpose !== "profile-photo" || (!isLocalProfilePhoto(payload.key) && !isMongoProfilePhoto(payload.key)) || (isLocalProfilePhoto(payload.key) && process.env.NODE_ENV === "production")) {
     return res.status(403).json({ error: "Profile photo link is invalid" });
   }
   try {
-    const user = await User.findById(payload.sub).select("+photoKey");
+    const user = await User.findById(payload.sub).select("+photoKey +photoData +photoMime");
     if (!user || user.photoKey !== payload.key) return res.status(404).json({ error: "Profile photo not found" });
-    const image = await readLocalProfilePhoto(payload.key);
-    const type = payload.key.endsWith(".png") ? "image/png" : payload.key.endsWith(".webp") ? "image/webp" : "image/jpeg";
+    const image = isMongoProfilePhoto(payload.key) ? user.photoData : await readLocalProfilePhoto(payload.key);
+    if (!image?.length) return res.status(404).json({ error: "Profile photo not found" });
+    const type = isMongoProfilePhoto(payload.key) ? user.photoMime : payload.key.endsWith(".png") ? "image/png" : payload.key.endsWith(".webp") ? "image/webp" : "image/jpeg";
     res.set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer", "Cross-Origin-Resource-Policy": "cross-origin" });
     res.type(type).send(image);
   } catch (error) { next(error); }
@@ -65,7 +66,7 @@ router.post("/login", limiter, async (req, res, next) => {
   try {
     const parsed = credentials.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Enter a valid email and password" });
-    const user = await User.findOne({ email: parsed.data.email }).select("+passwordHash +photoKey");
+    const user = await User.findOne({ email: parsed.data.email }).select("+passwordHash +photoKey +photoData +photoMime");
     if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -75,7 +76,7 @@ router.post("/login", limiter, async (req, res, next) => {
 
 router.get("/me", authenticate, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select("+photoKey");
+    const user = await User.findById(req.user.id).select("+photoKey +photoData +photoMime");
     if (!user) return res.status(401).json({ error: "Account not found" });
     res.json({ user: await publicUser(user, req) });
   } catch (error) { next(error); }
@@ -86,14 +87,23 @@ router.patch("/profile", authenticate, photoUpload.single("photo"), async (req, 
     const parsed = profileSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
     if (req.file && !validProfilePhoto(req.file)) return res.status(400).json({ error: "Upload a valid JPG, PNG, or WebP image" });
-    const user = await User.findById(req.user.id).select("+photoKey");
+    const user = await User.findById(req.user.id).select("+photoKey +photoData +photoMime");
     if (!user) return res.status(401).json({ error: "Account not found" });
     const previousPhoto = user.photoKey;
     let newPhoto = "";
     try {
       if (req.file) newPhoto = await uploadProfilePhoto(req.user.id, req.file);
       user.name = parsed.data.name;
-      if (newPhoto) user.photoKey = newPhoto;
+      if (newPhoto) {
+        user.photoKey = newPhoto;
+        if (isMongoProfilePhoto(newPhoto)) {
+          user.photoData = req.file.buffer;
+          user.photoMime = req.file.mimetype;
+        } else {
+          user.photoData = undefined;
+          user.photoMime = "";
+        }
+      }
       await user.save();
     } catch (error) {
       if (newPhoto) await deleteProfilePhoto(newPhoto).catch((cleanupError) => console.error("Could not remove failed profile upload", cleanupError));
@@ -108,7 +118,7 @@ router.patch("/settings", authenticate, async (req, res, next) => {
   try {
     const parsed = settingsSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-    const user = await User.findByIdAndUpdate(req.user.id, { emailNotifications: parsed.data.emailNotifications }, { new: true }).select("+photoKey");
+    const user = await User.findByIdAndUpdate(req.user.id, { emailNotifications: parsed.data.emailNotifications }, { new: true }).select("+photoKey +photoData +photoMime");
     if (!user) return res.status(401).json({ error: "Account not found" });
     res.json({ user: await publicUser(user, req) });
   } catch (error) { next(error); }

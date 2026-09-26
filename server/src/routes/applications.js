@@ -4,7 +4,7 @@ import multer from "multer";
 import { z } from "zod";
 import { Application, STATUSES, PRIORITIES } from "../models/Application.js";
 import { authenticate } from "../middleware/auth.js";
-import { createResumeStorage, deleteResume, discardResumeUpload, finalizeResumeUpload, getResumeUrl, isLocalResume, readLocalResume } from "../services/s3.js";
+import { createResumeStorage, deleteResume, discardResumeUpload, finalizeResumeUpload, getResumeBuffer, getResumeUrl, isLocalResume, isMongoResume } from "../services/s3.js";
 import { invalidateAnalyticsCache } from "../services/analytics-cache.js";
 
 const router = Router();
@@ -15,8 +15,8 @@ router.get("/:id/resume/view", async (req, res, next) => {
   if (payload.purpose !== "resume" || payload.applicationId !== req.params.id) return res.status(403).json({ error: "Resume link is invalid" });
   try {
     const application = await Application.findOne({ _id: req.params.id, userId: payload.sub }).select("+resumeKey");
-    if (!application || !isLocalResume(application.resumeKey)) return res.status(404).json({ error: "Resume not found" });
-    const pdf = await readLocalResume(application.resumeKey);
+    if (!application || (!isLocalResume(application.resumeKey) && !isMongoResume(application.resumeKey))) return res.status(404).json({ error: "Resume not found" });
+    const pdf = await getResumeBuffer(application.resumeKey);
     res.set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer", "Content-Disposition": 'inline; filename="resume.pdf"' });
     res.type("application/pdf").send(pdf);
   } catch (error) { next(error); }

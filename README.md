@@ -4,13 +4,17 @@ A job application tracker with a Kanban pipeline, AI career assistance, analytic
 
 Live app and API: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). Vercel serves the Vite client and the Express REST API from the same origin.
 
-The interface uses teal glass panels and supports day and night modes. Its public landing page includes an animated product feature grid, AI workflow preview, scroll-triggered proof metrics, and focused conversion CTA. The dedicated AI Career Studio at `/ai-tools` keeps Cover Letter and Resume Match workflows easy to find outside the Kanban cards. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The theme toggle appears on the sign-in page and in the workspace header, and the preference is saved in the browser.
+The interface uses teal glass panels and supports synchronized day and night modes across the landing page and authenticated workspace. Its public landing page includes an animated product feature grid, AI workflow preview, scroll-triggered proof metrics, and focused conversion CTA. The dedicated AI Career Studio at `/ai-tools` keeps Cover Letter and Resume Match workflows easy to find outside the Kanban cards. The sign-in hero uses Aceternity UI's Background Beams, recolored to match the theme. The global theme preference is stored in the browser and restored before React renders.
 
 ## Product tour
 
 ### Premium landing experience
 
 ![Applywise landing page](docs/screenshots/landing-page.png)
+
+### Synchronized light theme
+
+![Applywise landing page in light mode](docs/screenshots/landing-page-light.png)
 
 ### Kanban pipeline with drag feedback
 
@@ -27,7 +31,7 @@ The interface uses teal glass panels and supports day and night modes. Its publi
 ## Stack
 
 - Client: React 19, Vite, Tailwind CSS 4, shadcn/ui components, Framer Motion, Recharts, `@hello-pangea/dnd`, Socket.io client
-- API: Node.js, Express 5, MongoDB aggregation pipelines with Mongoose, Redis, BullMQ, JWT, bcrypt, LangChain with Google Gemini, AWS S3 via `multer-s3`, Socket.io
+- API: Node.js, Express 5, MongoDB aggregation pipelines with Mongoose, Redis, BullMQ, JWT, bcrypt, LangChain with Google Gemini, AWS S3 via `multer-s3`, MongoDB GridFS fallback storage, Socket.io
 - Local containers: Docker Compose with MongoDB, Redis, API, BullMQ AI worker, and Vite client
 - Production: Vercel for the Vite client and Express API, MongoDB Atlas for persistent data
 - Alternative API host: Render configuration is included in `render.yaml`
@@ -71,11 +75,11 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_S3_BUCKET` | Private S3 bucket location |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
-| `RESUME_STORAGE` | `local` for development files, `s3` for AWS S3; `dev:local` selects local storage when no S3 bucket is set |
+| `RESUME_STORAGE` | Optional override: `local` for development files or `s3` for AWS S3; without S3, production uses private MongoDB GridFS |
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. The local preview does not make a Gemini request or claim knowledge of a company's interview process. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, `multer-s3` streams resume PDFs to private S3 objects with AES-256 server-side encryption. Applywise stores the private object key and URL as hidden application metadata and returns only five-minute signed read links. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. Resume Match previews intentionally return no percentage because a demo must not look like a real analysis. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, configured S3 credentials store private files with AES-256 server-side encryption; without S3, resumes use private MongoDB GridFS and profile photos use protected MongoDB binary storage behind signed URLs. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 2 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ## Deployment
 
@@ -85,7 +89,7 @@ The current production deployment uses the root `vercel.json`. It builds `client
 2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
 3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up, Tips, Cover Letter, Resume Match, and LangChain career insight generation. `GEMINI_MODEL` defaults to the low-latency model `gemini-3.5-flash-lite`.
 4. Add a managed Redis connection as `REDIS_URL` to enable the five-minute production analytics cache. The API remains available without Redis and reports a cache bypass.
-5. Create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to enable production resume and profile photo uploads.
+5. Optionally create a private S3 bucket and add `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`. When omitted, production uploads remain functional through MongoDB storage.
 6. Redeploy after changing environment variables.
 
 The application saves accounts, profile preferences, and applications in MongoDB Atlas. Status changes always update through the REST API and show a toast. For cross-client Socket.io events in production, set `VITE_SOCKET_URL` to a persistent Socket.io service; local Docker and Node development use the included Socket.io server directly.
@@ -122,6 +126,8 @@ BullMQ requires a long-running worker process. The included `render.yaml` define
 | `GET` | `/api/health` | Health check |
 
 The bearer JWT scopes application, analytics, export, AI generation, and BullMQ job lookups to the signed in user. Analytics uses MongoDB `$match`, `$group`, and `$project` stages instead of loading application documents into Node.js. AI jobs use retry backoff and retained results; the API emits completion events to the user's Socket.io room while polling remains available when persistent sockets are unavailable. The API validates inputs, rate limits auth and AI calls, and limits resume uploads to verified PDFs up to 5 MB. Status changes are emitted to the user's Socket.io room.
+
+Resume Match v2 requires a resume PDF and a job description of at least 80 characters. Gemini extracts evidence, required and preferred skills, and category assessments; it does not choose the final percentage. Applywise validates the structured response and calculates the score from a transparent rubric: skills 40%, experience 25%, responsibilities 15%, education 10%, and keywords 10%. Non-applicable categories are removed and the remaining weights are normalized. The result includes confidence, gaps, recommendations, and a reminder that the score is decision support rather than an official ATS outcome.
 
 ## Verification
 

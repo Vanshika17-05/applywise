@@ -5,7 +5,7 @@ import { MongoMemoryServer } from "mongodb-memory-server-core";
 import { createApp } from "../src/app.js";
 import { connectDatabase } from "../src/config/db.js";
 import { Application } from "../src/models/Application.js";
-import { createResumeStorage, deleteResume, finalizeResumeUpload, getResumeBuffer } from "../src/services/s3.js";
+import { createResumeStorage, deleteResume, finalizeResumeUpload, getResumeBuffer, isMongoResume, uploadResume } from "../src/services/s3.js";
 import { generateQueuedAi } from "../src/services/queued-ai.js";
 
 let mongo;
@@ -54,6 +54,7 @@ before(async () => {
   process.env.RESUME_STORAGE = "local";
   delete process.env.GEMINI_API_KEY;
   delete process.env.REDIS_URL;
+  delete process.env.AWS_S3_BUCKET;
   mongo = await MongoMemoryServer.create({ instance: { dbName: "applywise-isolation" } });
   process.env.MONGODB_URI = mongo.getUri("applywise-isolation");
   const legacyOwner = new mongoose.Types.ObjectId();
@@ -107,6 +108,27 @@ test("applications are isolated by the authenticated user ID", async () => {
   }), (error) => error.status === 400);
   process.env.RESUME_STORAGE = "s3";
   assert.ok(createResumeStorage(), "Production resume storage must use multer-s3");
+  process.env.RESUME_STORAGE = "local";
+
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  delete process.env.RESUME_STORAGE;
+  const mongoResumeKey = await uploadResume(userA.user.id, { buffer: Buffer.from("%PDF-1.7\nMongoDB GridFS resume") });
+  assert.equal(isMongoResume(mongoResumeKey), true, "Production uploads must fall back to private GridFS when S3 is not configured");
+  assert.match((await getResumeBuffer(mongoResumeKey)).toString(), /GridFS resume/);
+  await deleteResume(mongoResumeKey);
+
+  const profileForm = new FormData();
+  profileForm.set("name", "User Alpha");
+  profileForm.set("photo", new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")], { type: "image/png" }), "avatar.png");
+  const profileUpdate = await request("/auth/profile", { token: userA.token, method: "PATCH", body: profileForm });
+  assert.equal(profileUpdate.response.status, 200);
+  assert.equal(profileUpdate.data.user.name, "User Alpha");
+  assert.match(profileUpdate.data.user.photoUrl, /\/api\/auth\/photo\/view\?token=/);
+  const photoResponse = await fetch(profileUpdate.data.user.photoUrl);
+  assert.equal(photoResponse.status, 200, "MongoDB-backed profile photo must be readable through its signed URL");
+  assert.equal(photoResponse.headers.get("content-type"), "image/png");
+  process.env.NODE_ENV = previousNodeEnv;
   process.env.RESUME_STORAGE = "local";
 
   const created = [];
@@ -178,17 +200,27 @@ test("applications are isolated by the authenticated user ID", async () => {
   const coverLetter = await request(`/ai/${created[0]._id}/cover-letter`, { token: userA.token, method: "POST" });
   assert.equal(coverLetter.response.status, 200);
   assert.match(coverLetter.data.result, /Dear Hiring Team at User A Company 1/);
+  assert.match(coverLetter.data.result, /User Alpha/);
+  assert.doesNotMatch(coverLetter.data.result, /\[(?:Applicant Name|Your Name)\]/);
+
+  const followUp = await request("/ai/generate-email", { token: userA.token, method: "POST", body: { applicationId: created[0]._id } });
+  assert.equal(followUp.response.status, 200);
+  assert.match(followUp.data.result, /Best,\nUser Alpha/);
+  const tips = await request(`/ai/${created[0]._id}/tips`, { token: userA.token, method: "POST" });
+  assert.equal(tips.response.status, 200);
+  assert.match(tips.data.result, /User Alpha/);
 
   const matchScore = await request(`/ai/${created[0]._id}/match-score`, { token: userA.token, method: "POST", body: { jobDescription: "Looking for React Node engineer" } });
-  assert.equal(matchScore.response.status, 200);
-  assert.equal(typeof matchScore.data.result.score, "number");
+  assert.equal(matchScore.response.status, 400, "Resume analysis must require both a resume and a complete job description");
 
   const oneTimeResume = new FormData();
-  oneTimeResume.append("jobDescription", "Looking for React Node engineer with AWS and testing experience");
+  oneTimeResume.append("jobDescription", "Looking for a React and Node.js engineer with MongoDB, AWS, automated testing, REST APIs, and scalable backend systems experience.");
   oneTimeResume.append("resume", new Blob([Buffer.from("%PDF-1.7\nApplywise one-time resume")], { type: "application/pdf" }), "resume.pdf");
   const uploadedMatchScore = await request(`/ai/${created[0]._id}/match-score`, { token: userA.token, method: "POST", body: oneTimeResume });
   assert.equal(uploadedMatchScore.response.status, 200);
-  assert.equal(typeof uploadedMatchScore.data.result.score, "number", "One-time PDF analysis must return a structured score");
+  assert.equal(uploadedMatchScore.data.result.score, null, "Demo mode must never present an invented resume score");
+  assert.equal(uploadedMatchScore.data.result.demo, true);
+  assert.equal(uploadedMatchScore.data.source, "preview");
 
   const quickCreate = await request("/applications/quick", {
     token: userA.token,

@@ -11,12 +11,12 @@ const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "web
 
 function localMode() {
   if (process.env.AWS_S3_BUCKET) return false;
-  if (process.env.NODE_ENV === "production") {
-    const error = new Error("Profile photo uploads require an AWS S3 bucket");
-    error.status = 503;
-    throw error;
-  }
-  return true;
+  return process.env.NODE_ENV !== "production";
+}
+
+export function profilePhotoStorageMode() {
+  if (process.env.AWS_S3_BUCKET) return "s3";
+  return process.env.NODE_ENV === "production" ? "mongo" : "local";
 }
 
 function localPath(key) {
@@ -29,6 +29,10 @@ export function isLocalProfilePhoto(key) {
   return typeof key === "string" && key.startsWith("local-photo/");
 }
 
+export function isMongoProfilePhoto(key) {
+  return typeof key === "string" && key.startsWith("mongo-photo/");
+}
+
 export function validProfilePhoto(file) {
   if (!file || !extensions[file.mimetype]) return false;
   const bytes = file.buffer;
@@ -39,6 +43,7 @@ export function validProfilePhoto(file) {
 
 export async function uploadProfilePhoto(userId, file) {
   const extension = extensions[file.mimetype];
+  if (profilePhotoStorageMode() === "mongo") return `mongo-photo/${userId}/${randomUUID()}.${extension}`;
   if (localMode()) {
     const key = `local-photo/${userId}/${randomUUID()}.${extension}`;
     const destination = localPath(key);
@@ -56,8 +61,8 @@ export async function uploadProfilePhoto(userId, file) {
 
 export async function getProfilePhotoUrl(key, { userId, origin }) {
   if (!key) return null;
-  if (isLocalProfilePhoto(key)) {
-    if (process.env.NODE_ENV === "production") return null;
+  if (isLocalProfilePhoto(key) || isMongoProfilePhoto(key)) {
+    if (isLocalProfilePhoto(key) && process.env.NODE_ENV === "production") return null;
     const token = jwt.sign({ sub: userId, purpose: "profile-photo", key }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" });
     return `${origin}/api/auth/photo/view?token=${encodeURIComponent(token)}`;
   }
@@ -70,6 +75,7 @@ export async function readLocalProfilePhoto(key) {
 
 export async function deleteProfilePhoto(key) {
   if (!key) return;
+  if (isMongoProfilePhoto(key)) return;
   if (isLocalProfilePhoto(key)) { await unlink(localPath(key)); return; }
   await client.send(new DeleteObjectCommand({ Bucket: process.env.AWS_S3_BUCKET, Key: key }));
 }

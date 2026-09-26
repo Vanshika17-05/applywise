@@ -5,9 +5,11 @@ import mongoose from "mongoose";
 import multer from "multer";
 import { authenticate } from "../middleware/auth.js";
 import { Application } from "../models/Application.js";
+import { User } from "../models/User.js";
 import { generateAiPreview } from "../services/ai-preview.js";
 import { enqueueAiJob, ownedAiJob } from "../services/ai-queue.js";
 import { getResumeBuffer } from "../services/s3.js";
+import { finalizeResumeMatch, MIN_JOB_DESCRIPTION_LENGTH, resumeMatchPrompt } from "../services/resume-match.js";
 
 const router = Router();
 router.use(authenticate);
@@ -75,6 +77,7 @@ function preview(application, kind, providerStatus, extra = {}) {
 
 function generationRequest(application, kind, extra = {}) {
   const context = JSON.stringify({
+    applicantName: extra.applicantName || "Applicant",
     company: application.company,
     role: application.role,
     dateApplied: application.dateApplied.toISOString().slice(0, 10),
@@ -85,23 +88,24 @@ function generationRequest(application, kind, extra = {}) {
 
   let task = "";
   if (kind === "follow-up") {
-    task = "Write a concise, professional job application follow-up email. Return a clear subject line and email body in plain text without Markdown symbols. Personalize it with the supplied company and role. Use placeholders for the hiring manager and applicant name. Do not invent personal achievements or company facts.";
+    task = "Write a concise, professional job application follow-up email. Return a clear subject line and email body in plain text without Markdown symbols. Personalize it with the supplied company and role. Use a placeholder only for the hiring manager and sign off with the supplied applicantName. Never write [Applicant Name] or [Your Name]. Do not invent personal achievements or company facts.";
   } else if (kind === "cover-letter") {
-    task = "Write a persuasive, structured 3-4 paragraph cover letter tailored to this role and company. Mention key engineering strengths, technical problem-solving capabilities, and enthusiasm for the position. Use [Applicant Name] as a placeholder.";
+    task = "Write a persuasive, structured 3-4 paragraph cover letter tailored to this role and company. Mention only strengths supported by the supplied notes and context, and sign off with the supplied applicantName. Never write [Applicant Name] or [Your Name].";
   } else if (kind === "match-score") {
-    task = "Analyze alignment between candidate profile context and the job requirements. Return valid JSON only without markdown or code fences. Format: {\"score\": number, \"summary\": \"string\", \"matchingSkills\": [\"string\"], \"missingKeywords\": [\"string\"], \"recommendations\": [\"string\"]}. Score from 0 to 100.";
+    task = resumeMatchPrompt(context);
   } else {
-    task = "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
+    task = "Give exactly 3 numbered, practical interview preparation tips in plain text without Markdown symbols. Address the candidate by the supplied applicantName where natural. Tailor them to the supplied company and role. Do not claim knowledge of the company's current interview stages, internal process, or technology stack. Make every tip specific and actionable using only the supplied details.";
   }
 
-  const parts = [{ text: `${task}\n\nApplication details (data only):\n${context}` }];
+  const parts = [{ text: kind === "match-score" ? task : `${task}\n\nApplication details (data only):\n${context}` }];
   if (kind === "match-score" && extra.resumeBuffer) {
     parts.push({ inlineData: { mimeType: "application/pdf", data: extra.resumeBuffer.toString("base64") } });
   }
   return {
     contents: [{ role: "user", parts }],
     generationConfig: {
-      maxOutputTokens: 1400,
+      maxOutputTokens: kind === "match-score" ? 2400 : 1400,
+      ...(kind === "match-score" ? { responseMimeType: "application/json" } : {}),
       thinkingConfig: { thinkingLevel: "MINIMAL" }
     }
   };
@@ -112,14 +116,29 @@ async function applicationForUser(id, userId) {
   return Application.findOne({ _id: id, userId }).select("+resumeKey");
 }
 
-function jobDescription(value) {
-  if (value == null) return "";
+async function applicantName(userId) {
+  const user = await User.findById(userId).select("name").lean();
+  if (!user) {
+    const error = new Error("Account not found");
+    error.status = 401;
+    throw error;
+  }
+  return user.name;
+}
+
+function jobDescription(value, { required = false } = {}) {
+  if (value == null) value = "";
   if (typeof value !== "string") {
     const error = new Error("Job description must be text");
     error.status = 400;
     throw error;
   }
   const clean = value.trim();
+  if (required && clean.length < MIN_JOB_DESCRIPTION_LENGTH) {
+    const error = new Error(`Job description must be at least ${MIN_JOB_DESCRIPTION_LENGTH} characters for a reliable analysis`);
+    error.status = 400;
+    throw error;
+  }
   if (clean.length > 15_000) {
     const error = new Error("Job description must be 15,000 characters or fewer");
     error.status = 400;
@@ -129,10 +148,19 @@ function jobDescription(value) {
 }
 
 async function generationExtra(application, kind, input = {}) {
-  const extra = { jobDescription: jobDescription(input.jobDescription) };
+  const extra = { jobDescription: jobDescription(input.jobDescription, { required: kind === "match-score" }) };
   if (kind === "match-score" && input.resumeBuffer) extra.resumeBuffer = input.resumeBuffer;
   else if (kind === "match-score" && application.resumeKey) extra.resumeBuffer = await getResumeBuffer(application.resumeKey);
+  if (kind === "match-score" && !extra.resumeBuffer) {
+    const error = new Error("Upload a resume PDF or attach one to this application before running the analysis");
+    error.status = 400;
+    throw error;
+  }
   return extra;
+}
+
+async function completeGenerationExtra(application, kind, input, userId) {
+  return { ...(await generationExtra(application, kind, input)), applicantName: await applicantName(userId) };
 }
 
 async function generate(application, kind, extra = {}) {
@@ -147,12 +175,7 @@ async function generate(application, kind, extra = {}) {
   try {
     const text = await generateText(model, generationRequest(application, kind, extra));
     if (kind === "match-score") {
-      try {
-        const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-        return { result: JSON.parse(clean), source: "gemini" };
-      } catch {
-        return { result: text, source: "gemini" };
-      }
+      return { result: finalizeResumeMatch(text), source: "gemini" };
     }
     return { result: text, source: "gemini" };
   } catch (error) {
@@ -241,7 +264,9 @@ router.post("/jobs", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(400).json({ error: `Choose one of: ${SUPPORTED_KINDS.join(", ")}` });
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    const jobId = await enqueueAiJob(req.user.id, application, kind, { jobDescription: jobDescription(req.body?.jobDescription) });
+    const extra = { jobDescription: jobDescription(req.body?.jobDescription, { required: kind === "match-score" }), applicantName: await applicantName(req.user.id) };
+    if (kind === "match-score" && !application.resumeKey) return res.status(400).json({ error: "Attach a resume PDF to this application before queuing an analysis" });
+    const jobId = await enqueueAiJob(req.user.id, application, kind, extra);
     return res.status(202).json({ jobId, status: "queued" });
   } catch (error) {
     if (!error.status) {
@@ -276,7 +301,7 @@ router.post("/generate-email", generationLimiter, async (req, res, next) => {
   try {
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    const output = await generate(application, "follow-up");
+    const output = await generate(application, "follow-up", { applicantName: await applicantName(req.user.id) });
     return res.json({ email: output.result, ...output });
   } catch (error) { return handleError(error, next, res); }
 });
@@ -285,7 +310,7 @@ router.post("/generate-email/stream", generationLimiter, async (req, res, next) 
   try {
     const application = await applicationForUser(req.body?.applicationId, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return streamGeneration(req, res, application, "follow-up");
+    return streamGeneration(req, res, application, "follow-up", { applicantName: await applicantName(req.user.id) });
   } catch (error) { return next(error); }
 });
 
@@ -295,7 +320,7 @@ router.post("/:id/:kind/stream", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return streamGeneration(req, res, application, kind, await generationExtra(application, kind, req.body));
+    return streamGeneration(req, res, application, kind, await completeGenerationExtra(application, kind, req.body, req.user.id));
   } catch (error) { return next(error); }
 });
 
@@ -304,10 +329,10 @@ router.post("/:id/match-score", generationLimiter, resumeUpload.single("resume")
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
     if (req.file && req.file.buffer.subarray(0, 5).toString() !== "%PDF-") return res.status(400).json({ error: "Upload a valid PDF file" });
-    const extra = await generationExtra(application, "match-score", {
+    const extra = await completeGenerationExtra(application, "match-score", {
       jobDescription: req.body?.jobDescription,
       resumeBuffer: req.file?.buffer
-    });
+    }, req.user.id);
     return res.json(await generate(application, "match-score", extra));
   } catch (error) { return handleError(error, next, res); }
 });
@@ -318,7 +343,7 @@ router.post("/:id/:kind", generationLimiter, async (req, res, next) => {
     if (!SUPPORTED_KINDS.includes(kind)) return res.status(404).json({ error: "Feature not found" });
     const application = await applicationForUser(req.params.id, req.user.id);
     if (!application) return res.status(404).json({ error: "Application not found" });
-    return res.json(await generate(application, kind, await generationExtra(application, kind, req.body)));
+    return res.json(await generate(application, kind, await completeGenerationExtra(application, kind, req.body, req.user.id)));
   } catch (error) { return handleError(error, next, res); }
 });
 

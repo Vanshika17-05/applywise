@@ -5,6 +5,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import multerS3 from "multer-s3";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const client = new S3Client({ region: process.env.AWS_REGION || "ap-south-1" });
 const localRoot = path.resolve(import.meta.dirname, "../../.local/resumes");
@@ -23,7 +24,25 @@ function localMode() {
   return true;
 }
 
+function resumeStorageMode() {
+  if (process.env.RESUME_STORAGE === "local") return "local";
+  if (process.env.RESUME_STORAGE === "s3" || process.env.AWS_S3_BUCKET) return "s3";
+  return "mongo";
+}
+
 export function isLocalResume(key) { return typeof key === "string" && key.startsWith("local/"); }
+export function isMongoResume(key) { return typeof key === "string" && key.startsWith("mongo-resume/"); }
+
+function gridFs() {
+  if (!mongoose.connection.db) throw new Error("MongoDB is not connected");
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "resumes" });
+}
+
+function mongoResumeId(key) {
+  const value = key?.replace(/^mongo-resume\//, "");
+  if (!mongoose.isValidObjectId(value)) throw new Error("Invalid MongoDB resume key");
+  return new mongoose.Types.ObjectId(value);
+}
 
 function localPath(key) {
   const match = /^local\/([a-f\d]{24})\/([a-f\d-]{36})\.pdf$/.exec(key);
@@ -47,7 +66,7 @@ function s3ObjectUrl(key) {
 }
 
 export function createResumeStorage() {
-  if (localMode()) return null;
+  if (resumeStorageMode() !== "s3") return null;
   return multerS3({
     s3: client,
     bucket: (_req, _file, callback) => {
@@ -70,6 +89,14 @@ export async function uploadResume(userId, file) {
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, file.buffer, { flag: "wx", mode: 0o600 });
     return key;
+  }
+  if (resumeStorageMode() === "mongo") {
+    const upload = gridFs().openUploadStream(`${randomUUID()}.pdf`, {
+      contentType: "application/pdf",
+      metadata: { ownerId: userId, private: true }
+    });
+    await new Promise((resolve, reject) => { upload.once("finish", resolve); upload.once("error", reject); upload.end(file.buffer); });
+    return `mongo-resume/${upload.id}`;
   }
   const key = `resumes/${userId}/${randomUUID()}.pdf`;
   await client.send(new PutObjectCommand({
@@ -97,7 +124,7 @@ export async function finalizeResumeUpload(userId, file) {
     throw error;
   }
   const resumeKey = await uploadResume(userId, file);
-  return { resumeKey, resumeUrl: isLocalResume(resumeKey) ? undefined : s3ObjectUrl(resumeKey) };
+  return { resumeKey, resumeUrl: isLocalResume(resumeKey) || isMongoResume(resumeKey) ? undefined : s3ObjectUrl(resumeKey) };
 }
 
 export async function discardResumeUpload(file) {
@@ -105,8 +132,8 @@ export async function discardResumeUpload(file) {
 }
 
 export async function getResumeUrl(key, { userId, applicationId, origin } = {}) {
-  if (isLocalResume(key)) {
-    assertLocalAllowed();
+  if (isLocalResume(key) || isMongoResume(key)) {
+    if (isLocalResume(key)) assertLocalAllowed();
     const token = jwt.sign({ sub: userId, applicationId, purpose: "resume" }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "5m" });
     return `${origin}/api/applications/${applicationId}/resume/view?token=${encodeURIComponent(token)}`;
   }
@@ -123,6 +150,12 @@ export async function getResumeBuffer(key) {
   if (isLocalResume(key)) {
     return readLocalResume(key);
   }
+  if (isMongoResume(key)) {
+    const chunks = [];
+    const stream = gridFs().openDownloadStream(mongoResumeId(key));
+    for await (const chunk of stream) chunks.push(chunk);
+    return Buffer.concat(chunks);
+  }
   const response = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
   const byteArray = await response.Body.transformToByteArray();
   return Buffer.from(byteArray);
@@ -131,5 +164,10 @@ export async function getResumeBuffer(key) {
 export async function deleteResume(key) {
   if (!key) return;
   if (isLocalResume(key)) { await unlink(localPath(key)); return; }
+  if (isMongoResume(key)) {
+    try { await gridFs().delete(mongoResumeId(key)); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+    return;
+  }
   await client.send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }
