@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import { connectDatabase } from "./config/db.js";
 import { createApp } from "./app.js";
 import { attachAiQueueEvents } from "./services/ai-queue.js";
+import { allowedOrigins } from "./config/origins.js";
 
 async function start() {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) throw new Error("Set a JWT_SECRET of at least 32 characters");
@@ -12,7 +13,7 @@ async function start() {
   const app = createApp();
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
-    cors: { origin: (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(",") }
+    cors: { origin: allowedOrigins(), methods: ["GET", "POST"] }
   });
   io.use((socket, next) => {
     try {

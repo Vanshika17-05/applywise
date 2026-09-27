@@ -15,7 +15,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: CLIENT_ORIGIN
-        sync: false
+        value: https://applywise-flax.vercel.app
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL

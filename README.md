@@ -73,7 +73,7 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `AI_WORKER_CONCURRENCY` | Parallel BullMQ AI jobs per worker; defaults to `4` |
 | `AI_WORKER_RATE_LIMIT` | Maximum AI jobs started per worker per minute; defaults to `20` |
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
-| `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
+| `CLIENT_ORIGIN` | Strict CORS and Socket.io allowlist, comma separated without paths; use `http://localhost:5173,https://applywise-flax.vercel.app` for local and deployed clients |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails, interview tips, cover letters, resume matching, and analytics insights |
 | `GEMINI_MODEL` | Required model identifier when live Gemini is explicitly enabled; no model is hardcoded in the application |
 | `ENABLE_EXTERNAL_AI` | Safety switch; must be exactly `true` before Applywise can make a Gemini request; defaults to `false` |

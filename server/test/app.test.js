@@ -24,6 +24,15 @@ test("applications require authentication", async () => {
   assert.equal(response.status, 401);
 });
 
+test("CORS allows the Applywise deployment and rejects unknown sites", async () => {
+  const allowed = await fetch(`${base}/api/health`, { headers: { Origin: "https://applywise-flax.vercel.app" } });
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://applywise-flax.vercel.app");
+  const rejected = await fetch(`${base}/api/health`, { headers: { Origin: "https://malicious.example" } });
+  assert.equal(rejected.status, 403);
+  assert.equal(rejected.headers.get("access-control-allow-origin"), null);
+});
+
 test("invalid signup is rejected before database access", async () => {
   const response = await fetch(`${base}/api/auth/register`, {
     method: "POST", headers: { "Content-Type": "application/json" },
