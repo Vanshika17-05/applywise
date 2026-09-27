@@ -6,6 +6,8 @@ import multer from "multer";
 import { z } from "zod";
 import { User } from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
+import { authenticatedUserLimiter } from "../middleware/rate-limits.js";
+import { createSession, listSessions, revokeOtherSessions, revokeSession } from "../services/sessions.js";
 import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, isMongoProfilePhoto, readLocalProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
 
 const router = Router();
@@ -19,8 +21,9 @@ const profileSchema = z.object({ name: z.string().trim().min(2).max(80) });
 const settingsSchema = z.object({ emailNotifications: z.boolean() }).strict();
 const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
 
-function issueToken(user) {
-  return jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "7d" });
+async function issueToken(user, req) {
+  const session = await createSession(user.id, req.get("user-agent"));
+  return jwt.sign({ sub: user.id, jti: session.jti }, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "7d" });
 }
 
 async function publicUser(user, req) {
@@ -58,7 +61,7 @@ router.post("/register", limiter, async (req, res, next) => {
     const { name, email, password } = parsed.data;
     if (await User.exists({ email })) return res.status(409).json({ error: "An account with that email already exists" });
     const user = await User.create({ name, email, passwordHash: await bcrypt.hash(password, 12) });
-    res.status(201).json({ token: issueToken(user), user: await publicUser(user, req) });
+    res.status(201).json({ token: await issueToken(user, req), user: await publicUser(user, req) });
   } catch (error) { next(error); }
 });
 
@@ -70,15 +73,43 @@ router.post("/login", limiter, async (req, res, next) => {
     if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    res.json({ token: issueToken(user), user: await publicUser(user, req) });
+    res.json({ token: await issueToken(user, req), user: await publicUser(user, req) });
   } catch (error) { next(error); }
 });
 
-router.get("/me", authenticate, async (req, res, next) => {
+router.get("/me", authenticate, authenticatedUserLimiter, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select("+photoKey +photoData +photoMime");
     if (!user) return res.status(401).json({ error: "Account not found" });
     res.json({ user: await publicUser(user, req) });
+  } catch (error) { next(error); }
+});
+
+router.post("/logout", authenticate, authenticatedUserLimiter, async (req, res, next) => {
+  try {
+    await revokeSession(req.user.id, req.user.jti);
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+router.get("/sessions", authenticate, authenticatedUserLimiter, async (req, res, next) => {
+  try {
+    const sessions = (await listSessions(req.user.id)).map(({ jti, issuedAt, userAgent }) => ({ jti, issuedAt, userAgent, current: jti === req.user.jti }));
+    res.json({ sessions });
+  } catch (error) { next(error); }
+});
+
+router.delete("/sessions/others", authenticate, authenticatedUserLimiter, async (req, res, next) => {
+  try {
+    await revokeOtherSessions(req.user.id, req.user.jti);
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+router.delete("/sessions/:jti", authenticate, authenticatedUserLimiter, async (req, res, next) => {
+  try {
+    await revokeSession(req.user.id, req.params.jti);
+    res.status(204).end();
   } catch (error) { next(error); }
 });
 
@@ -114,10 +145,10 @@ async function updateProfile(req, res, next) {
   } catch (error) { next(error); }
 }
 
-router.patch("/profile", authenticate, photoUpload.single("photo"), updateProfile);
-router.put("/profile", authenticate, photoUpload.single("photo"), updateProfile);
+router.patch("/profile", authenticate, authenticatedUserLimiter, photoUpload.single("photo"), updateProfile);
+router.put("/profile", authenticate, authenticatedUserLimiter, photoUpload.single("photo"), updateProfile);
 
-router.patch("/settings", authenticate, async (req, res, next) => {
+router.patch("/settings", authenticate, authenticatedUserLimiter, async (req, res, next) => {
   try {
     const parsed = settingsSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });

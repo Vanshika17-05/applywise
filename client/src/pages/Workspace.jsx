@@ -90,7 +90,7 @@ export default function Workspace() {
 
   function openCreate() { setEditing(null); setFormOpen(true); }
   function openEdit(application) { setEditing(application); setFormOpen(true); }
-  function signOut() { logout(); navigate("/auth", { replace: true }); toast.success("Logged out successfully"); }
+  async function signOut() { await logout(); navigate("/auth", { replace: true }); toast.success("Logged out successfully"); }
   const counts = useMemo(() => applications.reduce((result, item) => ({ ...result, [item.status]: (result[item.status] || 0) + 1 }), {}), [applications]);
   const view = location.pathname.startsWith("/analytics") ? "Analytics" : location.pathname.startsWith("/ai-tools") ? "AI Tools" : location.pathname.startsWith("/profile") ? "Profile" : location.pathname.startsWith("/settings") ? "Settings" : "Overview";
 

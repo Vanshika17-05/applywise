@@ -27,7 +27,8 @@ export function AuthProvider({ children }) {
     setChecking(false);
   }
 
-  function logout() {
+  async function logout() {
+    if (session?.token) await api("/auth/logout", { method: "POST", token: session.token }).catch(() => {});
     localStorage.removeItem(STORAGE_KEY);
     setSession(null);
   }

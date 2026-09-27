@@ -19,7 +19,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.5-flash-lite
+        sync: false
+      - key: ENABLE_EXTERNAL_AI
+        value: "false"
       - key: AWS_REGION
         sync: false
       - key: AWS_S3_BUCKET
@@ -42,7 +44,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.5-flash-lite
+        sync: false
+      - key: ENABLE_EXTERNAL_AI
+        value: "false"
       - key: AI_DEMO_MODE
         value: "false"
       - key: AI_WORKER_CONCURRENCY

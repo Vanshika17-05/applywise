@@ -6,9 +6,11 @@ import { authenticate } from "../middleware/auth.js";
 import { Application } from "../models/Application.js";
 import { cachedAnalytics } from "../services/analytics-cache.js";
 import { analyticsSignature, calculateAnalytics, resolveAnalyticsRange } from "../services/analytics.js";
+import { authenticatedUserLimiter, sensitiveUserLimiter } from "../middleware/rate-limits.js";
 
 const router = Router();
 router.use(authenticate);
+router.use(authenticatedUserLimiter);
 
 async function analyticsFor(req) {
   const range = resolveAnalyticsRange(req.query);
@@ -28,7 +30,7 @@ function escapeCsv(value) {
   return /[",\n\r]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
-router.get("/export", async (req, res, next) => {
+router.get("/export", sensitiveUserLimiter, async (req, res, next) => {
   try {
     const range = resolveAnalyticsRange(req.query);
     const applications = await Application.find({
@@ -79,14 +81,15 @@ router.post("/insights", rateLimit({ windowMs: 60 * 60 * 1000, limit: 12, standa
     if (!analytics.summary.total) return res.status(400).json({ error: "Add an application before generating AI insights" });
     const fallback = previewInsights(analytics);
     const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) {
+    const modelName = process.env.GEMINI_MODEL?.trim();
+    if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey || !modelName) {
       if (process.env.AI_DEMO_MODE === "true") return res.json({ insights: fallback, source: "preview" });
-      return res.status(503).json({ error: "AI insights are unavailable. Configure GEMINI_API_KEY on the server." });
+      return res.status(503).json({ error: "Live AI is disabled. Configure GEMINI_API_KEY and GEMINI_MODEL, then explicitly set ENABLE_EXTERNAL_AI=true." });
     }
 
     const model = new ChatGoogleGenerativeAI({
       apiKey,
-      model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
+      model: modelName,
       temperature: 0.25,
       maxOutputTokens: 900
     });

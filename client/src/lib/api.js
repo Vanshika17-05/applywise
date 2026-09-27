@@ -14,6 +14,12 @@ export async function api(path, { token, body, ...options } = {}) {
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 429) {
+      const error = new Error("You're doing that a bit fast — try again in a moment");
+      error.status = 429;
+      error.retryAfter = data.retryAfter;
+      throw error;
+    }
     const error = new Error(data.error || "Request failed");
     error.status = response.status;
     throw error;

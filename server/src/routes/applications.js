@@ -6,6 +6,7 @@ import { Application, STATUSES, PRIORITIES } from "../models/Application.js";
 import { authenticate } from "../middleware/auth.js";
 import { createResumeStorage, deleteResume, discardResumeUpload, finalizeResumeUpload, getResumeBuffer, getResumeUrl, isLocalResume, isMongoResume } from "../services/s3.js";
 import { invalidateAnalyticsCache } from "../services/analytics-cache.js";
+import { authenticatedUserLimiter } from "../middleware/rate-limits.js";
 
 const router = Router();
 router.get("/:id/resume/view", async (req, res, next) => {
@@ -22,6 +23,7 @@ router.get("/:id/resume/view", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 router.use(authenticate);
+router.use(authenticatedUserLimiter);
 const upload = multer({
   storage: createResumeStorage() || multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },

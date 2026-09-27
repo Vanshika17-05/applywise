@@ -5,7 +5,7 @@ let clientPromise;
 let warned = false;
 let retryAt = 0;
 
-async function redisClient() {
+export async function redisClient() {
   const url = process.env.REDIS_URL?.trim();
   if (!url) return null;
   if (Date.now() < retryAt) return null;

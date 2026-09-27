@@ -6,11 +6,13 @@ import { Application } from "../models/Application.js";
 import { deleteProfilePhoto, getProfilePhotoUrl, isLocalProfilePhoto, isMongoProfilePhoto, uploadProfilePhoto, validProfilePhoto } from "../services/profile-photo.js";
 import { s3ObjectUrl } from "../config/s3.js";
 import { deleteResume, finalizeResumeUpload } from "../services/s3.js";
+import { authenticatedUserLimiter, sensitiveUserLimiter } from "../middleware/rate-limits.js";
 
 const router = Router();
 router.use(authenticate);
+router.use(authenticatedUserLimiter);
 
-router.post("/profile-photo", profilePhotoUpload.single("photo"), async (req, res, next) => {
+router.post("/profile-photo", sensitiveUserLimiter, profilePhotoUpload.single("photo"), async (req, res, next) => {
   let newKey = "";
   try {
     if (!req.file) return res.status(400).json({ error: "Choose a profile photo" });
@@ -54,7 +56,7 @@ router.delete("/profile-photo", async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.post("/resume", resumeUpload.single("resume"), async (req, res, next) => {
+router.post("/resume", sensitiveUserLimiter, resumeUpload.single("resume"), async (req, res, next) => {
   let newKey = "";
   try {
     if (!req.file) return res.status(400).json({ error: "Choose a resume PDF" });

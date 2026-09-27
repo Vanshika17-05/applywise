@@ -75,7 +75,8 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Exact client origin allowed by CORS and Socket.io; comma separated for multiple origins |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails, interview tips, cover letters, resume matching, and analytics insights |
-| `GEMINI_MODEL` | Gemini model; defaults to `gemini-3.5-flash-lite` |
+| `GEMINI_MODEL` | Required model identifier when live Gemini is explicitly enabled; no model is hardcoded in the application |
+| `ENABLE_EXTERNAL_AI` | Safety switch; must be exactly `true` before Applywise can make a Gemini request; defaults to `false` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_BUCKET_NAME` | Private S3 bucket location (`AWS_S3_BUCKET` remains supported as an alias) |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional locally; use IAM role credentials in AWS when possible |
@@ -83,7 +84,7 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `VITE_API_URL` | Optional separate API origin for the Vite client, without `/api`; omit for the same-origin Vercel deployment |
 | `VITE_SOCKET_URL` | Optional persistent Socket.io service origin for production live events |
 
-Without a Gemini key, `dev:local` and Docker Compose return labeled example output for AI actions. Resume Match previews intentionally return no percentage because a demo must not look like a real analysis. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, configured S3 credentials store private files with AES-256 server-side encryption; without S3, resumes use private MongoDB GridFS and profile photos use protected MongoDB binary storage behind signed URLs. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 4 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
+With `AI_DEMO_MODE=true` and `ENABLE_EXTERNAL_AI=false`, local development and Docker Compose return labeled example output and make no Gemini request. Resume Match previews intentionally return no percentage because a demo must not look like a real analysis. Any real Gemini request consumes provider quota, so it must be enabled deliberately with `ENABLE_EXTERNAL_AI=true`, `GEMINI_API_KEY`, and `GEMINI_MODEL`. Local development resume and profile photo uploads stay in the ignored `server/.local` folder. In production, configured S3 credentials store private files with AES-256 server-side encryption; without S3, resumes use private MongoDB GridFS and profile photos use protected MongoDB binary storage behind signed URLs. S3 credentials need `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` on the `resumes/` and `profile-photos/` prefixes. Profile photos accept JPG, PNG, or WebP files up to 4 MB. The email notification switch stores a preference in MongoDB; outbound email delivery is not part of this project.
 
 ### S3 bucket CORS
 
@@ -109,8 +110,8 @@ Paste this into **S3 → Permissions → Cross-origin resource sharing (CORS)**:
 The current production deployment uses the root `vercel.json`. It builds `client/dist`, exposes Express through `api/index.js`, and rewrites `/api/*` to that function. MongoDB Atlas is connected through the Vercel Marketplace and supplies `MONGODB_URI`.
 
 1. Import this repository into Vercel with `applywise` as the project root, or deploy from that directory with `vercel --prod`.
-2. Connect MongoDB Atlas and set `JWT_SECRET` plus `CLIENT_ORIGIN` in Vercel project environment variables.
-3. Add `GEMINI_API_KEY` from Google AI Studio for live Follow-up, Tips, Cover Letter, Resume Match, and LangChain career insight generation. `GEMINI_MODEL` defaults to the low-latency model 
+2. Connect MongoDB Atlas and set `JWT_SECRET`, `REDIS_URL`, and `CLIENT_ORIGIN=https://applywise-flax.vercel.app` in Vercel project environment variables. `REDIS_URL` provides distributed rate limiting and analytics caching.
+3. For live AI, explicitly set `ENABLE_EXTERNAL_AI=true`, then add `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-1.5-flash`. Leave the switch false for guaranteed zero Gemini requests from Applywise.
 4. Add a managed Redis connection as `REDIS_URL` to enable the five-minute production analytics cache. The API remains available without Redis and reports a cache bypass.
 5. Optionally create a private S3 bucket and add `AWS_REGION`, `AWS_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`. When omitted, production uploads remain functional through MongoDB storage.
 6. Redeploy after changing environment variables.

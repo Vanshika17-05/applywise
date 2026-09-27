@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, Save, Sun, Trash2, TriangleAlert } from "lucide-react";
+import { Bell, LogOut, MonitorSmartphone, Moon, Save, Sun, Trash2, TriangleAlert } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useAuth } from "@/state/auth";
@@ -18,8 +18,32 @@ export default function Settings({ applicationCount, applicationsLoading, onDele
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
 
   useEffect(() => setEmailNotifications(session.user.emailNotifications !== false), [session.user.emailNotifications]);
+  useEffect(() => {
+    let active = true;
+    api("/auth/sessions", { token: session.token }).then((data) => { if (active) setSessions(data.sessions); })
+      .catch((error) => toast.error(error.message)).finally(() => { if (active) setSessionsLoading(false); });
+    return () => { active = false; };
+  }, [session.token]);
+
+  async function revoke(jti) {
+    try {
+      await api(`/auth/sessions/${jti}`, { token: session.token, method: "DELETE" });
+      setSessions((current) => current.filter((item) => item.jti !== jti));
+      toast.success("Session revoked");
+    } catch (error) { toast.error(error.message); }
+  }
+
+  async function revokeOthers() {
+    try {
+      await api("/auth/sessions/others", { token: session.token, method: "DELETE" });
+      setSessions((current) => current.filter((item) => item.current));
+      toast.success("Other sessions revoked");
+    } catch (error) { toast.error(error.message); }
+  }
 
   async function save() {
     setSaving(true);
@@ -53,6 +77,11 @@ export default function Settings({ applicationCount, applicationsLoading, onDele
         <button type="button" onClick={() => setTheme("dark")} aria-pressed={theme === "dark"} className={`theme-choice flex items-center gap-3 rounded-xl p-4 text-left text-sm font-medium ${theme === "dark" ? "theme-choice-active" : ""}`}><Moon size={18} /> Dark mode</button>
         <button type="button" onClick={() => setTheme("light")} aria-pressed={theme === "light"} className={`theme-choice flex items-center gap-3 rounded-xl p-4 text-left text-sm font-medium ${theme === "light" ? "theme-choice-active" : ""}`}><Sun size={18} /> Light mode</button>
       </div>
+    </Card>
+
+    <Card className="mt-4 p-5 sm:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><span className="glass-icon flex size-10 shrink-0 items-center justify-center rounded-xl"><MonitorSmartphone size={18} /></span><div><h2 className="font-semibold">Active sessions</h2><p className="mt-1 text-sm text-subtle">Review devices signed into your Applywise account and revoke access instantly.</p></div></div><Button variant="secondary" onClick={revokeOthers} disabled={sessionsLoading || !sessions.some((item) => !item.current)}><LogOut size={15} /> Revoke all others</Button></div>
+      <div className="mt-5 space-y-2 border-t border-theme pt-5">{sessionsLoading ? <div className="h-16 animate-pulse rounded-xl glass-soft" /> : sessions.map((item) => <div key={item.jti} className="flex items-center justify-between gap-4 rounded-xl border border-theme p-4"><div className="min-w-0"><p className="truncate text-sm font-semibold">{item.userAgent || "Unknown device"}</p><p className="mt-1 text-xs text-faint">{item.current ? "Current session" : `Signed in ${new Date(item.issuedAt).toLocaleString()}`}</p></div>{!item.current && <Button variant="secondary" size="sm" onClick={() => revoke(item.jti)}>Revoke</Button>}</div>)}</div>
     </Card>
 
     <Card className="mt-4 p-5 sm:p-7">

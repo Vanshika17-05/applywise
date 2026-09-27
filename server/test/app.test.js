@@ -31,3 +31,16 @@ test("invalid signup is rejected before database access", async () => {
   });
   assert.equal(response.status, 400);
 });
+
+test("global limiter returns structured 429 and Retry-After", async () => {
+  let response;
+  for (let attempt = 0; attempt < 110; attempt += 1) {
+    response = await fetch(`${base}/api/health`);
+    if (response.status === 429) break;
+  }
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get("retry-after")) > 0);
+  const body = await response.json();
+  assert.equal(body.error, "rate_limit_exceeded");
+  assert.ok(body.retryAfter > 0);
+});
