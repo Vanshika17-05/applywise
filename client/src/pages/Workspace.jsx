@@ -15,7 +15,7 @@ const Analytics = lazy(() => import("@/pages/Analytics"));
 const AITools = lazy(() => import("@/pages/AITools"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
-const sidebarNavClass = ({ isActive }) => `relative flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 ${isActive ? "border-l-[3px] border-[#00d4aa] bg-accent-soft text-accent sidebar-nav-active shadow-[inset_0_0_16px_rgba(0,212,170,0.12)]" : "border-l-[3px] border-transparent text-subtle hover:bg-[var(--accent-muted)] hover:text-[var(--text)]"}`;
+const sidebarNavClass = ({ isActive }) => `relative flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 ${isActive ? "border-l-[3px] border-[#00d4aa] bg-accent-soft text-accent shadow-[inset_0_0_16px_rgba(0,212,170,0.12)]" : "border-l-[3px] border-transparent text-subtle hover:bg-[var(--accent-muted)] hover:text-[var(--text)]"}`;
 
 export default function Workspace() {
   const { session, logout } = useAuth();

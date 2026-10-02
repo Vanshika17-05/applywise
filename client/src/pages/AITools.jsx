@@ -11,22 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 const emptyMatch = { loading: false, result: null, source: "", error: "" };
 
-function ToolSkeleton({ title = "Generating with Gemini..." }) {
-  return <div className="ai-loading-box">
-    <div className="ai-loading-inner space-y-4 p-5">
-      <div className="flex items-center gap-2.5 text-xs font-semibold text-accent">
-        <motion.span animate={{ rotate: 360, scale: [1, 1.18, 1] }} transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }} className="flex size-5 items-center justify-center rounded-full bg-accent-soft">
-          <Sparkles size={13} />
-        </motion.span>
-        <span>{title}</span>
-        <span className="ai-cursor" />
-      </div>
-      <div className="space-y-3">
-        {["44%", "94%", "86%", "91%", "68%"].map((width, index) => (
-          <div key={width + index} className="ai-shimmer-bar h-3.5 rounded-full bg-accent-soft" style={{ width }} />
-        ))}
-      </div>
-    </div>
+function ToolSkeleton() {
+  return <div className="space-y-3 rounded-xl border border-[var(--accent-border)] bg-accent-soft p-5" aria-label="Generating AI result">
+    {["42%", "94%", "86%", "91%", "70%"].map((width, index) => <motion.div key={width} className="h-3 rounded-full bg-[var(--accent-muted)]" style={{ width }} animate={{ opacity: [.35, .9, .35] }} transition={{ duration: 1.2, repeat: Infinity, delay: index * .1 }} />)}
   </div>;
 }
 
@@ -117,7 +104,7 @@ export default function AITools({ applications, loading, token, onAddApplication
               {cover.loading ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Sparkles size={16} />}
               {cover.loading ? "Drafting your cover letter..." : "Generate cover letter"}
             </Button>
-            {cover.loading ? <ToolSkeleton title="Drafting tailored cover letter..." /> : cover.error ? <p role="alert" className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm">{cover.error}</p> : cover.result ? <>
+            {cover.loading ? <ToolSkeleton /> : cover.error ? <p role="alert" className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm">{cover.error}</p> : cover.result ? <>
               <div className="max-h-[46vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--accent-border)] bg-[var(--glass-soft)] p-5 text-sm leading-relaxed">
                 {cover.result}
               </div>
@@ -160,7 +147,7 @@ export default function AITools({ applications, loading, token, onAddApplication
               {match.loading ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <ScanSearch size={16} />}
               {match.loading ? "Analyzing evidence..." : "Analyze resume match"}
             </Button>
-            {match.loading ? <ToolSkeleton title="Analyzing resume vs job description..." /> : match.error ? <p role="alert" className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm">{match.error}</p> : match.result ? <>
+            {match.loading ? <ToolSkeleton /> : match.error ? <p role="alert" className="rounded-xl border border-[var(--accent-border)] bg-accent-soft p-4 text-sm">{match.error}</p> : match.result ? <>
               <MatchResult result={match.result} source={match.source} />
               <div className="flex justify-end">
                 <Button variant="secondary" onClick={() => { navigator.clipboard.writeText(JSON.stringify(match.result, null, 2)); toast.success("Analysis copied"); }}>

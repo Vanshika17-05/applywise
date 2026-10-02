@@ -65,25 +65,21 @@ function ApplicationCard({ application, index, token, onEdit, onDelete, onAI, ac
   }
 
   return <Draggable draggableId={application._id} index={index}>
-    {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} style={provided.draggableProps.style} className="mb-3">
-      <motion.div whileHover={snapshot.isDragging ? {} : { y: -3, scale: 1.01, transition: { duration: 0.2, ease: "easeOut" } }}>
-        <Card className={`application-card group overflow-hidden p-4 transition-all duration-200 hover:shadow-[0_0_0_1px_rgba(0,212,170,0.3),0_8px_24px_rgba(0,212,170,0.08)] ${snapshot.isDragging ? "!border-[var(--accent)] shadow-2xl" : ""}`}>
-          <div className="flex items-start gap-3">
-            <span className="glass-icon flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">{application.company[0]?.toUpperCase()}</span>
-            <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-muted" title={application.company}>{application.company}</p><p className="mt-0.5 truncate text-sm font-bold text-main" title={application.role}>{application.role}</p></div>
-            <span {...provided.dragHandleProps} aria-label={`Drag ${application.company} application`} className="rounded-md p-1 text-faint hover:bg-[var(--accent-muted)] hover:text-main"><GripVertical size={16} /></span>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2"><Badge className={priorityStyle(application.priority)}><span className="size-1.5 rounded-full bg-current" />{application.priority} priority</Badge><Badge className={`status-${application.status.toLowerCase()}`}>{application.status}</Badge></div>
-          <div className="mt-4 flex items-center gap-2 text-xs text-subtle"><CalendarDays size={13} /><span>Applied {dateLabel(application.dateApplied)}</span></div>
-          {(application.jobUrl || application.resumeName) && <div className="mt-3 flex items-center gap-3 text-xs">{application.jobUrl && <a href={application.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:text-accent">Job post <ArrowUpRight size={12} /></a>}{application.resumeName && <button onClick={openResume} className="inline-flex items-center gap-1 text-muted hover:text-[var(--text)]"><FileText size={12} /> Resume</button>}</div>}
-          <div className="mt-4 grid grid-cols-2 gap-1 border-t border-theme pt-3">
-            <button disabled={aiBusy} aria-busy={emailBusy} onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45">{emailBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Sparkles size={13} />} {emailBusy ? "Generating" : "AI email"}</button>
-            <button disabled={aiBusy} aria-busy={tipsBusy} onClick={() => onAI(application, "tips")} aria-label={`Generate interview tips for ${application.company}`} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-45">{tipsBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <WandSparkles size={13} />} {tipsBusy ? "Preparing" : "Tips"}</button>
-          </div>
-          <div className="mt-2 flex justify-end gap-1"><button onClick={() => onEdit(application)} title="Edit" aria-label={`Edit ${application.company}`} className="glass-action rounded-lg p-1.5"><Pencil size={13} /></button><button onClick={() => onDelete(application)} title="Delete" aria-label={`Delete ${application.company}`} className="rounded-lg p-1.5 text-faint hover:bg-[color-mix(in_srgb,var(--rejected)_12%,transparent)] hover:text-[var(--rejected)]"><Trash2 size={13} /></button></div>
-        </Card>
-      </motion.div>
-    </div>}
+    {(provided, snapshot) => <Card ref={provided.innerRef} {...provided.draggableProps} className={`application-card group mb-3 overflow-hidden p-4 transition-colors ${snapshot.isDragging ? "!border-[var(--accent)] shadow-2xl" : ""}`} style={provided.draggableProps.style}>
+      <div className="flex items-start gap-3">
+        <span className="glass-icon flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">{application.company[0]?.toUpperCase()}</span>
+        <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-muted" title={application.company}>{application.company}</p><p className="mt-0.5 truncate text-sm font-bold text-main" title={application.role}>{application.role}</p></div>
+        <span {...provided.dragHandleProps} aria-label={`Drag ${application.company} application`} className="rounded-md p-1 text-faint hover:bg-[var(--accent-muted)] hover:text-main"><GripVertical size={16} /></span>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2"><Badge className={priorityStyle(application.priority)}><span className="size-1.5 rounded-full bg-current" />{application.priority} priority</Badge><Badge className={`status-${application.status.toLowerCase()}`}>{application.status}</Badge></div>
+      <div className="mt-4 flex items-center gap-2 text-xs text-subtle"><CalendarDays size={13} /><span>Applied {dateLabel(application.dateApplied)}</span></div>
+      {(application.jobUrl || application.resumeName) && <div className="mt-3 flex items-center gap-3 text-xs">{application.jobUrl && <a href={application.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:text-accent">Job post <ArrowUpRight size={12} /></a>}{application.resumeName && <button onClick={openResume} className="inline-flex items-center gap-1 text-muted hover:text-[var(--text)]"><FileText size={12} /> Resume</button>}</div>}
+      <div className="mt-4 grid grid-cols-2 gap-1 border-t border-theme pt-3">
+        <button disabled={aiBusy} aria-busy={emailBusy} onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45">{emailBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Sparkles size={13} />} {emailBusy ? "Generating" : "AI email"}</button>
+        <button disabled={aiBusy} aria-busy={tipsBusy} onClick={() => onAI(application, "tips")} aria-label={`Generate interview tips for ${application.company}`} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-45">{tipsBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <WandSparkles size={13} />} {tipsBusy ? "Preparing" : "Tips"}</button>
+      </div>
+      <div className="mt-2 flex justify-end gap-1"><button onClick={() => onEdit(application)} title="Edit" aria-label={`Edit ${application.company}`} className="glass-action rounded-lg p-1.5"><Pencil size={13} /></button><button onClick={() => onDelete(application)} title="Delete" aria-label={`Delete ${application.company}`} className="rounded-lg p-1.5 text-faint hover:bg-[color-mix(in_srgb,var(--rejected)_12%,transparent)] hover:text-[var(--rejected)]"><Trash2 size={13} /></button></div>
+    </Card>}
   </Draggable>;
 }
 
@@ -91,7 +87,6 @@ export default function Board({ applications, loading, token, userName = "", use
   const [search, setSearch] = useState("");
   const [ai, setAI] = useState(null);
   const [dragging, setDragging] = useState(false);
-  const [spotlight, setSpotlight] = useState({ x: 0, y: 0, opacity: 0 });
   const aiRequest = useRef(null);
   const aiTextQueue = useRef([]);
   const aiTypingTimer = useRef(null);
@@ -99,19 +94,6 @@ export default function Board({ applications, loading, token, userName = "", use
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const filtered = useMemo(() => applications.filter((application) => `${application.company} ${application.role}`.toLowerCase().includes(search.toLowerCase())), [applications, search]);
   const responseRate = applications.length ? Math.round(applications.filter((application) => application.status !== "Applied").length / applications.length * 100) : 0;
-
-  function handleHeroMouseMove(event) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    setSpotlight({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-      opacity: 1
-    });
-  }
-
-  function handleHeroMouseLeave() {
-    setSpotlight((prev) => ({ ...prev, opacity: 0 }));
-  }
 
   useEffect(() => () => {
     aiRequest.current?.abort();
@@ -243,18 +225,8 @@ export default function Board({ applications, loading, token, userName = "", use
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      onMouseMove={handleHeroMouseMove}
-      onMouseLeave={handleHeroMouseLeave}
-      className="hero-glass dashboard-hero group relative overflow-hidden rounded-[28px] p-6 sm:p-8"
+      className="hero-glass dashboard-hero relative overflow-hidden rounded-[28px] p-6 sm:p-8"
     >
-      <div
-        className="pointer-events-none absolute -inset-px rounded-[28px] transition-opacity duration-300 ease-out"
-        style={{
-          opacity: spotlight.opacity,
-          background: `radial-gradient(400px circle at ${spotlight.x}px ${spotlight.y}px, rgba(0, 212, 170, 0.13), transparent 75%)`
-        }}
-        aria-hidden="true"
-      />
       <div className="hero-glow pointer-events-none absolute -right-10 -top-24 size-80 rounded-full" />
       <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
         <div className="flex items-center gap-4">
