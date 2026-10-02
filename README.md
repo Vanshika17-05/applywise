@@ -1,6 +1,13 @@
 # Applywise
 
-A job application tracker with a Kanban pipeline, AI career assistance, analytics, private resume uploads, and live status notifications.
+A modern job application tracker with a Kanban pipeline, AI career assistance powered by Google Gemini & LangChain, actionable analytics, private AWS S3 / GridFS resume storage, Docker support, and live WebSocket notifications.
+
+[![Google Gemini](https://img.shields.io/badge/AI-Google_Gemini-28d6c4?style=flat&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![LangChain](https://img.shields.io/badge/Framework-LangChain-1c3c3d?style=flat&logo=langchain&logoColor=white)](https://www.langchain.com/)
+[![AWS S3](https://img.shields.io/badge/Storage-AWS_S3-569a8f?style=flat&logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
+[![Docker](https://img.shields.io/badge/Containers-Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![React 19](https://img.shields.io/badge/Frontend-React_19-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
 
 Live app and API: [applywise-flax.vercel.app](https://applywise-flax.vercel.app). Vercel serves the Vite client and the Express REST API from the same origin.
 
@@ -10,27 +17,27 @@ The interface uses teal glass panels and supports synchronized day and night mod
 
 ### Premium landing experience
 
-![Applywise landing page](docs/screenshots/landing-page.png)
+![Applywise landing page](./docs/screenshots/landing-page.png)
 
 ### Synchronized light theme
 
-![Applywise landing page in light mode](docs/screenshots/landing-page-light.png)
+![Applywise landing page in light mode](./docs/screenshots/landing-page-light.png)
 
 ### Kanban pipeline with drag feedback
 
-![Applywise Kanban pipeline](docs/screenshots/kanban-pipeline.png)
+![Applywise Kanban pipeline](./docs/screenshots/kanban-pipeline.png)
 
 ### Persistent profile photos
 
-![Applywise profile photo settings](docs/screenshots/profile-photo-saved.png)
+![Applywise profile photo settings](./docs/screenshots/profile-photo-saved.png)
 
 ### AI Career Studio
 
-![Applywise AI Career Studio](docs/screenshots/ai-career-studio.png)
+![Applywise AI Career Studio](./docs/screenshots/ai-career-studio.png)
 
 ### Actionable analytics
 
-![Applywise analytics dashboard](docs/screenshots/analytics-dashboard.png)
+![Applywise analytics dashboard](./docs/screenshots/analytics-dashboard.png)
 
 ## Stack
 
@@ -75,7 +82,7 @@ The Compose file supplies local MongoDB and Redis services plus a development JW
 | `JWT_SECRET` | JWT signing key, at least 32 characters |
 | `CLIENT_ORIGIN` | Strict CORS and Socket.io allowlist, comma separated without paths; use `http://localhost:5173,https://applywise-flax.vercel.app` for local and deployed clients |
 | `GEMINI_API_KEY` | Google AI Studio credential for follow-up emails, interview tips, cover letters, resume matching, and analytics insights |
-| `GEMINI_MODEL` | Required model identifier when live Gemini is explicitly enabled; no model is hardcoded in the application |
+| `GEMINI_MODEL` | Google Gemini model identifier (e.g., `gemini-1.5-flash` or `gemini-2.0-flash`); defaults to `gemini-1.5-flash` |
 | `ENABLE_EXTERNAL_AI` | Safety switch; must be exactly `true` before Applywise can make a Gemini request; defaults to `false` |
 | `AI_DEMO_MODE` | `true` enables clearly labeled preview output when the configured AI provider is unavailable |
 | `AWS_REGION`, `AWS_BUCKET_NAME` | Private S3 bucket location (`AWS_S3_BUCKET` remains supported as an alias) |

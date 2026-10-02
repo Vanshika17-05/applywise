@@ -40,10 +40,10 @@ export async function generateQueuedAi(application, kind, extra = {}) {
     if ((extra.jobDescription || "").trim().length < MIN_JOB_DESCRIPTION_LENGTH) throw new Error(`Job description must be at least ${MIN_JOB_DESCRIPTION_LENGTH} characters`);
   }
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const modelName = process.env.GEMINI_MODEL?.trim();
-  if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey || !modelName) {
+  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+  if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey) {
     if (process.env.AI_DEMO_MODE === "true") return { result: generateAiPreview(application, kind, extra), source: "preview" };
-    throw new Error("External AI must be explicitly enabled and GEMINI_API_KEY/GEMINI_MODEL configured");
+    throw new Error("External AI must be explicitly enabled and GEMINI_API_KEY configured");
   }
 
   try {

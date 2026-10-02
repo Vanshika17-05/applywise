@@ -38,8 +38,8 @@ class GeminiProviderError extends Error {
 
 function geminiModel() {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const modelName = process.env.GEMINI_MODEL?.trim();
-  if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey || !modelName) return null;
+  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+  if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey) return null;
 
   const client = new GoogleGenerativeAI(apiKey);
   return client.getGenerativeModel({

@@ -323,8 +323,78 @@ html[data-theme="light"] .landing-extended .text-\[\#637b76\] { color: var(--mut
 .priority-medium { border-color: color-mix(in srgb, var(--warning) 25%, transparent); background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning); }
 .priority-low { border-color: var(--stroke); background: var(--glass-soft); color: var(--muted); }
 
+@keyframes sidebar-pulse-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 14px rgba(0, 212, 170, 0.12), 0 0 16px rgba(0, 212, 170, 0.08);
+  }
+  50% {
+    box-shadow: inset 0 0 20px rgba(0, 212, 170, 0.22), 0 0 24px rgba(0, 212, 170, 0.15);
+  }
+}
+.sidebar-nav-active {
+  animation: sidebar-pulse-glow 3.2s ease-in-out infinite;
+}
+
+/* Effect 9: AI Tools Loading Animations */
+@keyframes ai-gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes ai-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.ai-loading-box {
+  position: relative;
+  border-radius: 1.1rem;
+  padding: 1.5px;
+  background: linear-gradient(90deg, #00d4aa, rgba(0, 212, 170, 0.2), #198caa, #00d4aa);
+  background-size: 300% 300%;
+  animation: ai-gradient-rotate 3s linear infinite;
+  overflow: hidden;
+}
+
+.ai-loading-inner {
+  border-radius: inherit;
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.ai-shimmer-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-shimmer-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 170, 0.35), transparent);
+  animation: ai-shimmer 1.6s ease-in-out infinite;
+}
+
+.ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  background-color: #00d4aa;
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: ai-cursor-blink 0.85s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  .hero-aurora, .career-pill, .career-status-dot, .account-menu, .landing-final-cta { animation: none !important; }
+  .hero-aurora, .career-pill, .career-status-dot, .account-menu, .landing-final-cta, .sidebar-nav-active, .ai-loading-box { animation: none !important; }
   .pipeline-preview-card:hover, .landing-feature-card:hover, .landing-social-link:hover { transform: none; }
 }

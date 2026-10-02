@@ -48,7 +48,7 @@ function ActivityHeatmap({ days }) {
     return { cells: [...Array(first).fill(null), ...days], max: Math.max(...days.map((day) => day.applications), 1) };
   }, [days]);
   const weeks = Math.max(1, Math.ceil(cells.length / 7));
-  return <div className="mt-6 overflow-x-auto pb-2"><div className="flex min-w-max gap-2"><div className="grid grid-rows-7 gap-1 pr-1 text-[9px] text-faint">{["Sun", "", "Tue", "", "Thu", "", "Sat"].map((label, index) => <span key={index} className="flex h-3 items-center">{label}</span>)}</div><div className="grid grid-flow-col grid-rows-7 gap-1" style={{ gridTemplateColumns: `repeat(${weeks}, 0.75rem)` }}>{cells.map((day, index) => day ? <span key={day.date} title={`${day.date}: ${day.applications} application${day.applications === 1 ? "" : "s"}`} aria-label={`${day.date}, ${day.applications} applications`} className="size-3 rounded-[3px] border border-theme" style={{ background: day.applications ? `color-mix(in srgb, var(--accent) ${25 + Math.round((day.applications / max) * 70)}%, var(--glass-soft))` : "var(--glass-soft)" }} /> : <span key={`empty-${index}`} className="size-3" />)}</div></div><div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-faint"><span>Less</span>{[0, 25, 45, 70, 95].map((opacity) => <span key={opacity} className="size-3 rounded-[3px] border border-theme" style={{ background: opacity ? `color-mix(in srgb, var(--accent) ${opacity}%, var(--glass-soft))` : "var(--glass-soft)" }} />)}<span>More</span></div></div>;
+  return <div className="mt-6 overflow-x-auto pb-2"><div className="flex min-w-max gap-2"><div className="grid grid-rows-7 gap-1 pr-1 text-[9px] text-faint">{["Sun", "", "Tue", "", "Thu", "", "Sat"].map((label, index) => <span key={index} className="flex h-3 items-center">{label}</span>)}</div><div className="grid grid-flow-col grid-rows-7 gap-1" style={{ gridTemplateColumns: `repeat(${weeks}, 0.75rem)` }}>{cells.map((day, index) => day ? <motion.span key={day.date} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .22, delay: Math.min(index * .005, .5), ease: "easeOut" }} title={`${day.date}: ${day.applications} application${day.applications === 1 ? "" : "s"}`} aria-label={`${day.date}, ${day.applications} applications`} className="size-3 rounded-[3px] border border-theme transition-transform hover:scale-125" style={{ background: day.applications ? `color-mix(in srgb, var(--accent) ${25 + Math.round((day.applications / max) * 70)}%, var(--glass-soft))` : "var(--glass-soft)" }} /> : <span key={`empty-${index}`} className="size-3" />)}</div></div><div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-faint"><span>Less</span>{[0, 25, 45, 70, 95].map((opacity) => <span key={opacity} className="size-3 rounded-[3px] border border-theme" style={{ background: opacity ? `color-mix(in srgb, var(--accent) ${opacity}%, var(--glass-soft))` : "var(--glass-soft)" }} />)}<span>More</span></div></div>;
 }
 
 function EmptyAnalytics({ hasApplications, onAddApplication, rangeLabel }) {
@@ -101,21 +101,132 @@ export default function Analytics({ applications, loading: applicationsLoading, 
   const breakdown = (analytics?.statusBreakdown || []).map((item) => ({ ...item, color: colors[item.name] }));
   const rangeLabel = analytics?.range.label || rangeOptions.find((item) => item.value === range)?.label || "Selected range";
 
+  const statCards = [
+    { label: "Total applications", value: analytics?.summary.total || 0, icon: BriefcaseBusiness, detail: rangeLabel, color: "text-accent", bg: "bg-accent-soft" },
+    { label: "Response rate", value: analytics?.summary.responseRate || 0, suffix: "%", icon: ArrowUpRight, detail: "Moved beyond applied", color: "status-offer", bg: "" },
+    { label: "Interview stage", value: analytics?.summary.interviews || 0, icon: MessageCircle, detail: "Active and completed", color: "status-interview", bg: "" },
+    { label: "Offers", value: analytics?.summary.offers || 0, icon: Target, detail: `${analytics?.summary.offerRate || 0}% conversion`, color: "priority-medium", bg: "" }
+  ];
+
   return <div>
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-accent"><span className="h-px w-4 bg-[var(--accent)]" /> Your progress</div><h1 className="mt-2 text-3xl font-bold tracking-tight">The numbers behind your next move.</h1><p className="mt-2 text-sm text-subtle">Actionable insights from your application pipeline.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Select value={range} onValueChange={setRange}><SelectTrigger className="w-full gap-2 sm:w-[180px]" aria-label="Analytics date range"><CalendarDays size={15} className="text-subtle" /><SelectValue /></SelectTrigger><SelectContent>{rangeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button variant="secondary" onClick={exportCsv} disabled={!analytics?.summary.total}><Download size={15} /> Export CSV</Button></div></motion.div>
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, ease: "easeOut" }} className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+      <div>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-accent"><span className="h-px w-4 bg-[var(--accent)]" /> Your progress</div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">The numbers behind your next move.</h1>
+        <p className="mt-2 text-sm text-subtle">Actionable insights from your application pipeline.</p>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Select value={range} onValueChange={setRange}>
+          <SelectTrigger className="w-full gap-2 sm:w-[180px]" aria-label="Analytics date range"><CalendarDays size={15} className="text-subtle" /><SelectValue /></SelectTrigger>
+          <SelectContent>{rangeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+        </Select>
+        <Button variant="secondary" onClick={exportCsv} disabled={!analytics?.summary.total}><Download size={15} /> Export CSV</Button>
+      </div>
+    </motion.div>
     {range === "custom" && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 flex flex-col gap-3 rounded-2xl p-4 glass-soft sm:flex-row sm:items-end"><label className="flex-1 text-xs font-medium text-muted">From<Input type="date" className="mt-1.5" value={draftCustom.from} max={draftCustom.to} onChange={(event) => setDraftCustom((current) => ({ ...current, from: event.target.value }))} /></label><label className="flex-1 text-xs font-medium text-muted">To<Input type="date" className="mt-1.5" value={draftCustom.to} min={draftCustom.from} onChange={(event) => setDraftCustom((current) => ({ ...current, to: event.target.value }))} /></label><Button onClick={() => setCustom(draftCustom)}>Apply range</Button></motion.div>}
-    <div className="mt-7 flex gap-1 rounded-xl border border-theme bg-[var(--glass-soft)] p-1 sm:w-fit"><button onClick={() => setTab("overview")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === "overview" ? "bg-accent-soft text-accent" : "text-subtle hover:text-main"}`}>Overview</button><button onClick={() => setTab("insights")} className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition ${tab === "insights" ? "bg-accent-soft text-accent" : "text-subtle hover:text-main"}`}><Sparkles size={14} /> AI Insights</button></div>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .35, delay: .15 }} className="mt-7 flex gap-1 rounded-xl border border-theme bg-[var(--glass-soft)] p-1 sm:w-fit">
+      <button onClick={() => setTab("overview")} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === "overview" ? "bg-accent-soft text-accent" : "text-subtle hover:text-main"}`}>Overview</button>
+      <button onClick={() => setTab("insights")} className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition ${tab === "insights" ? "bg-accent-soft text-accent" : "text-subtle hover:text-main"}`}><Sparkles size={14} /> AI Insights</button>
+    </motion.div>
     {state.loading ? <AnalyticsSkeleton /> : state.error ? <Card className="mt-8 p-7"><p className="font-semibold">Analytics could not be loaded.</p><p className="mt-1 text-sm text-subtle">{state.error}</p></Card> : !analytics?.summary.total ? <EmptyAnalytics hasApplications={!applicationsLoading && applications.length > 0} onAddApplication={onAddApplication} rangeLabel={rangeLabel} /> : tab === "insights" ? <Insights token={token} query={query} /> : <>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
-        { label: "Total applications", value: analytics.summary.total, icon: BriefcaseBusiness, detail: rangeLabel, color: "text-accent", bg: "bg-accent-soft" },
-        { label: "Response rate", value: analytics.summary.responseRate, suffix: "%", icon: ArrowUpRight, detail: "Moved beyond applied", color: "status-offer", bg: "" },
-        { label: "Interview stage", value: analytics.summary.interviews, icon: MessageCircle, detail: "Active and completed", color: "status-interview", bg: "" },
-        { label: "Offers", value: analytics.summary.offers, icon: Target, detail: `${analytics.summary.offerRate}% conversion`, color: "priority-medium", bg: "" }
-      ].map((item) => <Card key={item.label} className="p-5"><div className="flex items-start justify-between"><p className="text-xs font-medium text-muted">{item.label}</p><span className={`flex size-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}><item.icon size={16} /></span></div><p className="mt-4 text-3xl font-bold tracking-tight tabular-nums"><CountUp value={item.value} suffix={item.suffix} /></p><p className="mt-1 text-xs text-faint">{item.detail}</p></Card>)}</div>
-      <div className="mt-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]"><Card className="min-w-0 p-5 sm:p-7"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Application activity</h2><p className="mt-1 text-sm text-subtle">Applications submitted across the selected range</p></div><span className="glass-soft shrink-0 rounded-lg px-2.5 py-1 text-xs text-muted">{rangeLabel}</span></div><div className="mt-8 h-[270px] w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.activity} margin={{ top: 10, right: 8, left: -28, bottom: 0 }}><defs><linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent)" stopOpacity={.35} /><stop offset="100%" stopColor="var(--accent)" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="var(--chart-grid)" vertical={false} /><XAxis dataKey="label" minTickGap={28} tick={{ fill: "var(--subtle)", fontSize: 11 }} axisLine={false} tickLine={false} dy={9} /><YAxis allowDecimals={false} tick={{ fill: "var(--subtle)", fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--text)" }} itemStyle={{ color: "var(--accent-text)" }} cursor={{ stroke: "var(--accent)", strokeDasharray: "4 4" }} /><Area type="monotone" dataKey="applications" stroke="var(--accent)" strokeWidth={3} fill="url(#activityFill)" activeDot={{ r: 5, fill: "var(--accent)" }} /></AreaChart></ResponsiveContainer></div></Card><Card className="min-w-0 p-5 sm:p-7"><h2 className="text-lg font-semibold">Status breakdown</h2><p className="mt-1 text-sm text-subtle">Where opportunities stand today</p><div className="relative mt-2 h-[215px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ value: 1 }]} dataKey="value" cx="50%" cy="50%" innerRadius={66} outerRadius={88} fill="var(--stroke)" stroke="none" isAnimationActive={false} /><Pie data={breakdown.filter((item) => item.value > 0)} dataKey="value" cx="50%" cy="50%" innerRadius={66} outerRadius={88} paddingAngle={4} stroke="none" cornerRadius={5}>{breakdown.filter((item) => item.value > 0).map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip contentStyle={tooltipStyle} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="text-3xl font-bold"><CountUp value={analytics.summary.total} /></span><span className="text-xs text-subtle">total</span></div></div><div className="grid grid-cols-2 gap-x-5 gap-y-3">{breakdown.map((item) => <div key={item.name} className="flex items-center justify-between gap-3 text-xs"><span className="flex items-center gap-2 text-muted"><span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span><span className="font-semibold tabular-nums">{item.value}</span></div>)}</div></Card></div>
-      <Card className="mt-4 min-w-0 p-5 sm:p-7"><div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start"><div><h2 className="text-lg font-semibold">Conversion funnel</h2><p className="mt-1 text-sm text-subtle">How applications move from submission to outcome</p></div><span className="text-[11px] text-faint">Screened means a recorded response; stages are inferred from current status.</span></div><p className="mt-3 text-[10px] text-faint sm:hidden">Swipe horizontally to explore every stage.</p><div className="mt-4 w-full overflow-x-auto sm:mt-6"><div className="h-[320px] min-w-[680px]"><ResponsiveContainer width="100%" height="100%"><Sankey data={analytics.funnel} node={<FunnelNode />} nodePadding={34} nodeWidth={12} link={{ stroke: "var(--accent)", strokeOpacity: .24 }} margin={{ top: 20, right: 110, bottom: 20, left: 20 }}><Tooltip contentStyle={tooltipStyle} /></Sankey></ResponsiveContainer></div></div></Card>
-      <Card className="mt-4 p-5 sm:p-7"><div className="flex items-start justify-between"><div><h2 className="text-lg font-semibold">Application consistency</h2><p className="mt-1 text-sm text-subtle">Your day-by-day activity, inspired by contribution graphs</p></div><CalendarDays size={18} className="text-accent" /></div><ActivityHeatmap days={analytics.heatmap} /></Card>
-      <Card className="mt-4 flex items-start gap-3 border-[var(--accent-border)] bg-accent-soft p-5"><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><BarChart3 size={17} /></span><div><p className="text-sm font-semibold">Every application tells a story.</p><p className="mt-1 text-xs leading-relaxed text-subtle">Response rate counts applications that have moved beyond Applied. Keep your statuses current for a more accurate view.</p></div></Card>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((item, index) => (
+          <motion.div key={item.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .1 + index * .08, ease: "easeOut" }}>
+            <Card className="h-full p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-muted">{item.label}</p>
+                <span className={`flex size-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}><item.icon size={16} /></span>
+              </div>
+              <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums"><CountUp value={item.value} suffix={item.suffix} duration={1.5} /></p>
+              <p className="mt-1 text-xs text-faint">{item.detail}</p>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+      <div className="mt-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .25, ease: "easeOut" }}>
+          <Card className="min-w-0 p-5 sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 className="text-lg font-semibold">Application activity</h2><p className="mt-1 text-sm text-subtle">Applications submitted across the selected range</p></div>
+              <span className="glass-soft shrink-0 rounded-lg px-2.5 py-1 text-xs text-muted">{rangeLabel}</span>
+            </div>
+            <div className="mt-8 h-[270px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={analytics.activity} margin={{ top: 10, right: 8, left: -28, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent)" stopOpacity={.35} />
+                      <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="label" minTickGap={28} tick={{ fill: "var(--subtle)", fontSize: 11 }} axisLine={false} tickLine={false} dy={9} />
+                  <YAxis allowDecimals={false} tick={{ fill: "var(--subtle)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "var(--text)" }} itemStyle={{ color: "var(--accent-text)" }} cursor={{ stroke: "var(--accent)", strokeDasharray: "4 4" }} />
+                  <Area type="monotone" dataKey="applications" stroke="var(--accent)" strokeWidth={3} fill="url(#activityFill)" activeDot={{ r: 5, fill: "var(--accent)" }} isAnimationActive animationBegin={150} animationDuration={1400} animationEasing="ease-out" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .32, ease: "easeOut" }}>
+          <Card className="min-w-0 p-5 sm:p-7">
+            <h2 className="text-lg font-semibold">Status breakdown</h2><p className="mt-1 text-sm text-subtle">Where opportunities stand today</p>
+            <div className="relative mt-2 h-[215px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={[{ value: 1 }]} dataKey="value" cx="50%" cy="50%" innerRadius={66} outerRadius={88} fill="var(--stroke)" stroke="none" isAnimationActive={false} />
+                  <Pie data={breakdown.filter((item) => item.value > 0)} dataKey="value" cx="50%" cy="50%" innerRadius={66} outerRadius={88} paddingAngle={4} stroke="none" cornerRadius={5} isAnimationActive animationBegin={150} animationDuration={1400} animationEasing="ease-out">
+                    {breakdown.filter((item) => item.value > 0).map((item) => <Cell key={item.name} fill={item.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold"><CountUp value={analytics.summary.total} duration={1.5} /></span>
+                <span className="text-xs text-subtle">total</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-3">{breakdown.map((item) => <div key={item.name} className="flex items-center justify-between gap-3 text-xs"><span className="flex items-center gap-2 text-muted"><span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span><span className="font-semibold tabular-nums">{item.value}</span></div>)}</div>
+          </Card>
+        </motion.div>
+      </div>
+      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .4, ease: "easeOut" }}>
+        <Card className="mt-4 min-w-0 p-5 sm:p-7">
+          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+            <div><h2 className="text-lg font-semibold">Conversion funnel</h2><p className="mt-1 text-sm text-subtle">How applications move from submission to outcome</p></div>
+            <span className="text-[11px] text-faint">Screened means a recorded response; stages are inferred from current status.</span>
+          </div>
+          <p className="mt-3 text-[10px] text-faint sm:hidden">Swipe horizontally to explore every stage.</p>
+          <div className="mt-4 w-full overflow-x-auto sm:mt-6">
+            <div className="h-[320px] min-w-[680px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <Sankey data={analytics.funnel} node={<FunnelNode />} nodePadding={34} nodeWidth={12} link={{ stroke: "var(--accent)", strokeOpacity: .24 }} margin={{ top: 20, right: 110, bottom: 20, left: 20 }}>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </Sankey>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .48, ease: "easeOut" }}>
+        <Card className="mt-4 p-5 sm:p-7">
+          <div className="flex items-start justify-between">
+            <div><h2 className="text-lg font-semibold">Application consistency</h2><p className="mt-1 text-sm text-subtle">Your day-by-day activity, inspired by contribution graphs</p></div>
+            <CalendarDays size={18} className="text-accent" />
+          </div>
+          <ActivityHeatmap days={analytics.heatmap} />
+        </Card>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .54, ease: "easeOut" }}>
+        <Card className="mt-4 flex items-start gap-3 border-[var(--accent-border)] bg-accent-soft p-5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><BarChart3 size={17} /></span>
+          <div>
+            <p className="text-sm font-semibold">Every application tells a story.</p>
+            <p className="mt-1 text-xs leading-relaxed text-subtle">Response rate counts applications that have moved beyond Applied. Keep your statuses current for a more accurate view.</p>
+          </div>
+        </Card>
+      </motion.div>
     </>}
   </div>;
 }

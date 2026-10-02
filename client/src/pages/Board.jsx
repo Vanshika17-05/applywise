@@ -65,21 +65,25 @@ function ApplicationCard({ application, index, token, onEdit, onDelete, onAI, ac
   }
 
   return <Draggable draggableId={application._id} index={index}>
-    {(provided, snapshot) => <Card ref={provided.innerRef} {...provided.draggableProps} className={`application-card group mb-3 overflow-hidden p-4 transition-colors ${snapshot.isDragging ? "!border-[var(--accent)] shadow-2xl" : ""}`} style={provided.draggableProps.style}>
-      <div className="flex items-start gap-3">
-        <span className="glass-icon flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">{application.company[0]?.toUpperCase()}</span>
-        <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-muted" title={application.company}>{application.company}</p><p className="mt-0.5 truncate text-sm font-bold text-main" title={application.role}>{application.role}</p></div>
-        <span {...provided.dragHandleProps} aria-label={`Drag ${application.company} application`} className="rounded-md p-1 text-faint hover:bg-[var(--accent-muted)] hover:text-main"><GripVertical size={16} /></span>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2"><Badge className={priorityStyle(application.priority)}><span className="size-1.5 rounded-full bg-current" />{application.priority} priority</Badge><Badge className={`status-${application.status.toLowerCase()}`}>{application.status}</Badge></div>
-      <div className="mt-4 flex items-center gap-2 text-xs text-subtle"><CalendarDays size={13} /><span>Applied {dateLabel(application.dateApplied)}</span></div>
-      {(application.jobUrl || application.resumeName) && <div className="mt-3 flex items-center gap-3 text-xs">{application.jobUrl && <a href={application.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:text-accent">Job post <ArrowUpRight size={12} /></a>}{application.resumeName && <button onClick={openResume} className="inline-flex items-center gap-1 text-muted hover:text-[var(--text)]"><FileText size={12} /> Resume</button>}</div>}
-      <div className="mt-4 grid grid-cols-2 gap-1 border-t border-theme pt-3">
-        <button disabled={aiBusy} aria-busy={emailBusy} onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45">{emailBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Sparkles size={13} />} {emailBusy ? "Generating" : "AI email"}</button>
-        <button disabled={aiBusy} aria-busy={tipsBusy} onClick={() => onAI(application, "tips")} aria-label={`Generate interview tips for ${application.company}`} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-45">{tipsBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <WandSparkles size={13} />} {tipsBusy ? "Preparing" : "Tips"}</button>
-      </div>
-      <div className="mt-2 flex justify-end gap-1"><button onClick={() => onEdit(application)} title="Edit" aria-label={`Edit ${application.company}`} className="glass-action rounded-lg p-1.5"><Pencil size={13} /></button><button onClick={() => onDelete(application)} title="Delete" aria-label={`Delete ${application.company}`} className="rounded-lg p-1.5 text-faint hover:bg-[color-mix(in_srgb,var(--rejected)_12%,transparent)] hover:text-[var(--rejected)]"><Trash2 size={13} /></button></div>
-    </Card>}
+    {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} style={provided.draggableProps.style} className="mb-3">
+      <motion.div whileHover={snapshot.isDragging ? {} : { y: -3, scale: 1.01, transition: { duration: 0.2, ease: "easeOut" } }}>
+        <Card className={`application-card group overflow-hidden p-4 transition-all duration-200 hover:shadow-[0_0_0_1px_rgba(0,212,170,0.3),0_8px_24px_rgba(0,212,170,0.08)] ${snapshot.isDragging ? "!border-[var(--accent)] shadow-2xl" : ""}`}>
+          <div className="flex items-start gap-3">
+            <span className="glass-icon flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">{application.company[0]?.toUpperCase()}</span>
+            <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-muted" title={application.company}>{application.company}</p><p className="mt-0.5 truncate text-sm font-bold text-main" title={application.role}>{application.role}</p></div>
+            <span {...provided.dragHandleProps} aria-label={`Drag ${application.company} application`} className="rounded-md p-1 text-faint hover:bg-[var(--accent-muted)] hover:text-main"><GripVertical size={16} /></span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2"><Badge className={priorityStyle(application.priority)}><span className="size-1.5 rounded-full bg-current" />{application.priority} priority</Badge><Badge className={`status-${application.status.toLowerCase()}`}>{application.status}</Badge></div>
+          <div className="mt-4 flex items-center gap-2 text-xs text-subtle"><CalendarDays size={13} /><span>Applied {dateLabel(application.dateApplied)}</span></div>
+          {(application.jobUrl || application.resumeName) && <div className="mt-3 flex items-center gap-3 text-xs">{application.jobUrl && <a href={application.jobUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:text-accent">Job post <ArrowUpRight size={12} /></a>}{application.resumeName && <button onClick={openResume} className="inline-flex items-center gap-1 text-muted hover:text-[var(--text)]"><FileText size={12} /> Resume</button>}</div>}
+          <div className="mt-4 grid grid-cols-2 gap-1 border-t border-theme pt-3">
+            <button disabled={aiBusy} aria-busy={emailBusy} onClick={() => onAI(application, "follow-up")} aria-label={`Generate follow-up email for ${application.company}`} title="Generate follow-up email" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45">{emailBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <Sparkles size={13} />} {emailBusy ? "Generating" : "AI email"}</button>
+            <button disabled={aiBusy} aria-busy={tipsBusy} onClick={() => onAI(application, "tips")} aria-label={`Generate interview tips for ${application.company}`} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted hover:bg-[var(--accent-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-45">{tipsBusy ? <span className="size-3 animate-spin rounded-full border border-current border-t-transparent" /> : <WandSparkles size={13} />} {tipsBusy ? "Preparing" : "Tips"}</button>
+          </div>
+          <div className="mt-2 flex justify-end gap-1"><button onClick={() => onEdit(application)} title="Edit" aria-label={`Edit ${application.company}`} className="glass-action rounded-lg p-1.5"><Pencil size={13} /></button><button onClick={() => onDelete(application)} title="Delete" aria-label={`Delete ${application.company}`} className="rounded-lg p-1.5 text-faint hover:bg-[color-mix(in_srgb,var(--rejected)_12%,transparent)] hover:text-[var(--rejected)]"><Trash2 size={13} /></button></div>
+        </Card>
+      </motion.div>
+    </div>}
   </Draggable>;
 }
 
@@ -87,6 +91,7 @@ export default function Board({ applications, loading, token, userName = "", use
   const [search, setSearch] = useState("");
   const [ai, setAI] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [spotlight, setSpotlight] = useState({ x: 0, y: 0, opacity: 0 });
   const aiRequest = useRef(null);
   const aiTextQueue = useRef([]);
   const aiTypingTimer = useRef(null);
@@ -94,6 +99,19 @@ export default function Board({ applications, loading, token, userName = "", use
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const filtered = useMemo(() => applications.filter((application) => `${application.company} ${application.role}`.toLowerCase().includes(search.toLowerCase())), [applications, search]);
   const responseRate = applications.length ? Math.round(applications.filter((application) => application.status !== "Applied").length / applications.length * 100) : 0;
+
+  function handleHeroMouseMove(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSpotlight({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      opacity: 1
+    });
+  }
+
+  function handleHeroMouseLeave() {
+    setSpotlight((prev) => ({ ...prev, opacity: 0 }));
+  }
 
   useEffect(() => () => {
     aiRequest.current?.abort();
@@ -138,7 +156,7 @@ export default function Board({ applications, loading, token, userName = "", use
       const job = await api(`/ai/jobs/${queued.jobId}`, { token, signal: controller.signal });
       if (job.status === "completed") {
         revealQueuedResult(requestId, job.result, kind);
-        toast.success(aiMeta[kind].ready, { id: `ai-${queued.jobId}` });
+        toast.success(aiMeta[kind].ready, { id: `ai-${queued.jobId}`, icon: <Sparkles size={16} className="text-[#00d4aa]" /> });
         return;
       }
       if (job.status === "failed") throw new Error(job.error || "AI generation failed");
@@ -201,7 +219,7 @@ export default function Board({ applications, loading, token, userName = "", use
     }
   }
 
-  function openAI(application, kind) {
+  function handleAiAction(application, kind) {
     if (ai?.loading) return;
     runAI(application, kind);
   }
@@ -213,36 +231,174 @@ export default function Board({ applications, loading, token, userName = "", use
     if (application) onMove(application, result.destination.droppableId);
   }
 
+  const statItems = [
+    { label: "Total applications", value: applications.length, hint: "In your pipeline", icon: BriefcaseBusiness, color: "text-accent", bg: "bg-accent-soft" },
+    { label: "In interviews", value: applications.filter((item) => item.status === "Interview").length, hint: "Conversations in progress", icon: MoreHorizontal, color: "status-interview", bg: "" },
+    { label: "Offers received", value: applications.filter((item) => item.status === "Offer").length, hint: "Worth celebrating", icon: Sparkles, color: "status-offer", bg: "" },
+    { label: "Response rate", value: responseRate, suffix: "%", hint: "Moved beyond applied", icon: ArrowUpRight, color: "priority-medium", bg: "" }
+  ];
+
   return <div>
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="hero-glass dashboard-hero relative overflow-hidden rounded-[28px] p-6 sm:p-8">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      onMouseMove={handleHeroMouseMove}
+      onMouseLeave={handleHeroMouseLeave}
+      className="hero-glass dashboard-hero group relative overflow-hidden rounded-[28px] p-6 sm:p-8"
+    >
+      <div
+        className="pointer-events-none absolute -inset-px rounded-[28px] transition-opacity duration-300 ease-out"
+        style={{
+          opacity: spotlight.opacity,
+          background: `radial-gradient(400px circle at ${spotlight.x}px ${spotlight.y}px, rgba(0, 212, 170, 0.13), transparent 75%)`
+        }}
+        aria-hidden="true"
+      />
       <div className="hero-glow pointer-events-none absolute -right-10 -top-24 size-80 rounded-full" />
-      <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div className="flex items-center gap-4"><span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--accent-border)] bg-accent-soft text-lg font-bold text-accent">{userPhoto ? <img src={userPhoto} alt="" className="size-full object-cover" /> : firstName[0]?.toUpperCase()}</span><div><div className="accent-pill mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"><Sparkles size={12} /> Your workspace</div><h1 className="text-2xl font-bold tracking-[-.035em] sm:text-3xl">Good to see you, {firstName}.</h1><p className="mt-2 max-w-xl text-sm text-muted">Your opportunities, organized from first application to final decision.</p></div></div><Button asChild variant="secondary" className="self-start sm:self-auto"><Link to="/ai-tools"><Sparkles size={16} /> Open AI Career Studio</Link></Button></div>
+      <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-4">
+          <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--accent-border)] bg-accent-soft text-lg font-bold text-accent">
+            {userPhoto ? <img src={userPhoto} alt="" className="size-full object-cover" /> : firstName[0]?.toUpperCase()}
+          </span>
+          <div>
+            <div className="accent-pill mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold">
+              <Sparkles size={12} /> Your workspace
+            </div>
+            <h1 className="text-2xl font-bold tracking-[-.035em] sm:text-3xl">Good to see you, {firstName}.</h1>
+            <p className="mt-2 max-w-xl text-sm text-muted">Your opportunities, organized from first application to final decision.</p>
+          </div>
+        </div>
+        <Button asChild variant="secondary" className="self-start sm:self-auto">
+          <Link to="/ai-tools"><Sparkles size={16} /> Open AI Career Studio</Link>
+        </Button>
+      </div>
     </motion.div>
 
     <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {[
-        { label: "Total applications", value: applications.length, hint: "In your pipeline", icon: BriefcaseBusiness, color: "text-accent", bg: "bg-accent-soft" },
-        { label: "In interviews", value: applications.filter((item) => item.status === "Interview").length, hint: "Conversations in progress", icon: MoreHorizontal, color: "status-interview", bg: "" },
-        { label: "Offers received", value: applications.filter((item) => item.status === "Offer").length, hint: "Worth celebrating", icon: Sparkles, color: "status-offer", bg: "" },
-        { label: "Response rate", value: responseRate, suffix: "%", hint: "Moved beyond applied", icon: ArrowUpRight, color: "priority-medium", bg: "" }
-      ].map((item) => <Card key={item.label} className="p-5"><div className="flex items-start justify-between"><p className="text-xs font-medium text-muted">{item.label}</p><span className={`flex size-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}><item.icon size={16} /></span></div>{loading ? <div className="mt-3 h-9 w-20 animate-pulse rounded-lg bg-accent-soft" /> : <div className="mt-3 text-3xl font-bold tracking-tight tabular-nums"><CountUp value={item.value} suffix={item.suffix} /></div>}<p className="mt-1 text-xs text-faint">{item.hint}</p></Card>)}
+      {statItems.map((item, index) => (
+        <motion.div
+          key={item.label}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: "easeOut" }}
+        >
+          <Card className="h-full p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-xs font-medium text-muted">{item.label}</p>
+              <span className={`flex size-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}>
+                <item.icon size={16} />
+              </span>
+            </div>
+            {loading ? (
+              <div className="mt-3 h-9 w-20 animate-pulse rounded-lg bg-accent-soft" />
+            ) : (
+              <div className="mt-3 text-3xl font-bold tracking-tight tabular-nums">
+                <CountUp value={item.value} suffix={item.suffix} duration={1.5} />
+              </div>
+            )}
+            <p className="mt-1 text-xs text-faint">{item.hint}</p>
+          </Card>
+        </motion.div>
+      ))}
     </div>
 
-    <div className="mt-9 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-accent"><span className="h-px w-4 bg-[var(--accent)]" /> The pipeline</div><h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Application board</h2><p className="mt-1 text-sm text-subtle">Drag cards between stages as things progress.</p></div><div className="relative w-full sm:w-64"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" /><Input aria-label="Search applications" placeholder="Search company or role" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div></div>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+      className="mt-9 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"
+    >
+      <div>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-accent">
+          <span className="h-px w-4 bg-[var(--accent)]" /> The pipeline
+        </div>
+        <h2 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Application board</h2>
+        <p className="mt-1 text-sm text-subtle">Drag cards between stages as things progress.</p>
+      </div>
+      <div className="relative w-full sm:w-64">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+        <Input aria-label="Search applications" placeholder="Search company or role" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+    </motion.div>
 
-    {loading ? <div className="mt-6 grid gap-4 xl:grid-cols-4">{columns.map((column) => <div key={column.name} className="h-80 animate-pulse rounded-2xl glass-soft" />)}</div> : <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={dragEnd}>
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{columns.map((column) => {
-        const items = filtered.filter((application) => application.status === column.name);
-        return <Droppable key={column.name} droppableId={column.name}>{(provided, snapshot) => <div className={`board-lane min-w-0 rounded-2xl p-3.5 ${dragging ? "board-lane-dragging" : ""} ${snapshot.isDraggingOver ? "board-lane-over" : ""}`}>
-          <div className="mb-4 flex items-center gap-2.5 px-1"><span className={`size-2 rounded-full status-dot-${column.tone}`} /><h3 className="text-sm font-semibold">{column.name}</h3><span className={`status-${column.tone} ml-auto rounded-lg px-2 py-0.5 text-xs font-semibold`}>{items.length}</span></div>
-          <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[180px] rounded-xl transition-colors ${snapshot.isDraggingOver ? "drag-over" : ""}`}>
-            {items.length ? items.map((application, index) => <ApplicationCard key={application._id} application={application} index={index} token={token} onEdit={onEdit} onDelete={onDelete} onAI={openAI} activeAI={ai} />) : <div className="drop-empty flex min-h-[175px] flex-col items-center justify-center rounded-xl text-center"><span className={`status-${column.tone} mb-3 flex size-9 items-center justify-center rounded-xl`}><BriefcaseBusiness size={16} /></span><p className="text-xs font-medium text-subtle">No applications here</p><p className="mt-1 text-[11px] text-faint">Drop a card to move it</p></div>}
-            {provided.placeholder}
-          </div>
-        </div>}</Droppable>;
-      })}</div>
-    </DragDropContext>}
-    {!loading && applications.length === 0 && <div className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-[var(--accent-border)] bg-accent-soft p-8 text-center"><span className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent"><Plus size={20} /></span><h3 className="mt-3 font-semibold">Your journey starts with one application</h3><p className="mt-1 text-sm text-subtle">Add your first opportunity and watch your pipeline come to life.</p><Button className="mt-5" onClick={onCreate}><Plus size={15} /> Add your first application</Button></div>}
+    {loading ? (
+      <div className="mt-6 grid gap-4 xl:grid-cols-4">
+        {columns.map((column) => (
+          <div key={column.name} className="h-80 animate-pulse rounded-2xl glass-soft" />
+        ))}
+      </div>
+    ) : (
+      <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={dragEnd}>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {columns.map((column, colIdx) => {
+            const items = filtered.filter((application) => application.status === column.name);
+            return (
+              <motion.div
+                key={column.name}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.25 + colIdx * 0.15, ease: "easeOut" }}
+              >
+                <Droppable droppableId={column.name}>
+                  {(provided, snapshot) => (
+                    <div className={`board-lane min-w-0 rounded-2xl p-3.5 ${dragging ? "board-lane-dragging" : ""} ${snapshot.isDraggingOver ? "board-lane-over" : ""}`}>
+                      <div className="mb-4 flex items-center gap-2.5 px-1">
+                        <span className={`size-2 rounded-full status-dot-${column.tone}`} />
+                        <h3 className="text-sm font-semibold">{column.name}</h3>
+                        <span className={`status-${column.tone} ml-auto rounded-lg px-2 py-0.5 text-xs font-semibold`}>{items.length}</span>
+                      </div>
+                      <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[180px] rounded-xl transition-colors ${snapshot.isDraggingOver ? "drag-over" : ""}`}>
+                        {items.length ? (
+                          items.map((application, index) => (
+                            <ApplicationCard
+                              key={application._id}
+                              application={application}
+                              index={index}
+                              token={token}
+                              onEdit={onEdit}
+                              onDelete={onDelete}
+                              onAI={handleAiAction}
+                              activeAI={ai}
+                            />
+                          ))
+                        ) : (
+                          <div className="drop-empty flex min-h-[175px] flex-col items-center justify-center rounded-xl text-center">
+                            <span className={`status-${column.tone} mb-3 flex size-9 items-center justify-center rounded-xl`}>
+                              <BriefcaseBusiness size={16} />
+                            </span>
+                            <p className="text-xs font-medium text-subtle">No applications here</p>
+                            <p className="mt-1 text-[11px] text-faint">Drop a card to move it</p>
+                          </div>
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              </motion.div>
+            );
+          })}
+        </div>
+      </DragDropContext>
+    )}
+    {!loading && applications.length === 0 && (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+        className="mt-6 flex flex-col items-center rounded-2xl border border-dashed border-[var(--accent-border)] bg-accent-soft p-8 text-center"
+      >
+        <span className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent">
+          <Plus size={20} />
+        </span>
+        <h3 className="mt-3 font-semibold">Your journey starts with one application</h3>
+        <p className="mt-1 text-sm text-subtle">Add your first opportunity and watch your pipeline come to life.</p>
+        <Button className="mt-5" onClick={onCreate}>
+          <Plus size={15} /> Add your first application
+        </Button>
+      </motion.div>
+    )}
 
     <Dialog open={Boolean(ai)} onOpenChange={(open) => { if (!open && !ai?.loading) setAI(null); }}>
       <DialogContent className="ai-dialog" overlayClassName="ai-overlay" aria-busy={ai?.loading}>

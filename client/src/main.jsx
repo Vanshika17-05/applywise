@@ -7,7 +7,7 @@ import App from "./App.jsx";
 import "./index.css";
 
 function ThemedApp() {
-  return <><App /><Toaster position="bottom-right" gutter={10} toastOptions={{ className: "applywise-toast", duration: 4000, style: { background: "var(--glass-strong)", color: "var(--text)", border: "1px solid var(--accent-border)", boxShadow: "var(--shadow), 0 0 22px var(--accent-muted)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }, success: { iconTheme: { primary: "var(--accent)", secondary: "var(--accent-foreground)" } } }} /></>;
+  return <><App /><Toaster position="bottom-right" gutter={10} toastOptions={{ className: "applywise-toast", duration: 3000, style: { background: "var(--glass-strong)", color: "var(--text)", border: "1px solid var(--accent-border)", boxShadow: "var(--shadow), 0 0 22px var(--accent-muted)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }, success: { iconTheme: { primary: "#00d4aa", secondary: "var(--accent-foreground)" } } }} /></>;
 }
 
 createRoot(document.getElementById("root")).render(

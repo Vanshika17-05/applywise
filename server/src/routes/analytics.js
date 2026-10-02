@@ -81,10 +81,10 @@ router.post("/insights", rateLimit({ windowMs: 60 * 60 * 1000, limit: 12, standa
     if (!analytics.summary.total) return res.status(400).json({ error: "Add an application before generating AI insights" });
     const fallback = previewInsights(analytics);
     const apiKey = process.env.GEMINI_API_KEY?.trim();
-    const modelName = process.env.GEMINI_MODEL?.trim();
-    if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey || !modelName) {
+    const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+    if (process.env.ENABLE_EXTERNAL_AI !== "true" || !apiKey) {
       if (process.env.AI_DEMO_MODE === "true") return res.json({ insights: fallback, source: "preview" });
-      return res.status(503).json({ error: "Live AI is disabled. Configure GEMINI_API_KEY and GEMINI_MODEL, then explicitly set ENABLE_EXTERNAL_AI=true." });
+      return res.status(503).json({ error: "Live AI is disabled. Configure GEMINI_API_KEY and explicitly set ENABLE_EXTERNAL_AI=true." });
     }
 
     const model = new ChatGoogleGenerativeAI({
