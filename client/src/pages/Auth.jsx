@@ -31,14 +31,7 @@ export default function Auth() {
     finally { setBusy(false); }
   }
 
-  return <div className="min-h-screen page-bg">
-    <div className="aurora-container" aria-hidden="true">
-      <div className="aurora-blob aurora-blob-1" />
-      <div className="aurora-blob aurora-blob-2" />
-      <div className="aurora-blob aurora-blob-3" />
-    </div>
-    <div className="relative z-[1]">
-    <div className="grid min-h-screen page-bg lg:grid-cols-[1.06fr_.94fr]">
+  return <div className="min-h-screen page-bg"><div className="grid min-h-screen page-bg lg:grid-cols-[1.06fr_.94fr]">
     <ThemeToggle className="fixed right-6 top-6 z-40 sm:right-10 sm:top-10" />
     <div className="relative hidden overflow-hidden border-r border-theme glass-strong px-10 py-10 lg:flex lg:flex-col xl:px-16">
       <div aria-hidden="true" className="hero-aurora pointer-events-none absolute inset-0" />
@@ -81,5 +74,5 @@ export default function Auth() {
         <div className="mt-12 flex items-center justify-center gap-2 text-xs text-faint"><Check size={14} className="text-[var(--offer)]" /> Your applications stay private to your account</div>
       </motion.div>
     </div>
-  </div><LandingSections /></div></div>;
+  </div><LandingSections /></div>;
 }
